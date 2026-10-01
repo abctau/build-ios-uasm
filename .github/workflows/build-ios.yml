@@ -1,0 +1,33 @@
+name: build-ios-uasm
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install build tools
+        run: brew install cmake ninja
+
+      - name: Install deps
+        run: npm install
+
+      - name: Build iOS xcframework
+        run: npm run build:test-uasm:ios:release
+
+      - name: Pack uni_modules
+        run: npm run build:test-uasm:pack:uni-module:release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: UasmTestUasm-ios
+          path: |
+            build/ios/xcframework
+            uni_modules/test-uasm/uasm/app-ios
