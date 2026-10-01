@@ -1,0 +1,113 @@
+<template>
+	<view class="page">
+		<text class="title">uasm 插件测试：uni_modules/test-uasm</text>
+		<text class="text">onReady 时用 uni.loadUasm 加载 uasm 模块，校验 add(1, 2) === 3。</text>
+
+		<button class="btn" @click="testAdd">校验 add(1, 2)</button>
+		<button class="btn" @click="benchmarkAdd">压测 add x 1000000 次</button>
+		<button class="btn" @click="loadLib">重新加载模块</button>
+
+		<text class="result">{{ result }}</text>
+		<text class="error">{{ errorMessage }}</text>
+	</view>
+</template>
+
+<script setup lang="uts">
+	const result = ref("")
+	const errorMessage = ref("")
+
+	let lib : any = null
+
+	async function loadLib() {
+		errorMessage.value = ""
+		try {
+			lib = await uni.loadUasm("uni_modules/test-uasm")
+			result.value = "模块已加载"
+		} catch (e) {
+			lib = null
+			console.log(e)
+			errorMessage.value = "加载失败，请查看控制台日志"
+		}
+	}
+
+	function testAdd() {
+		errorMessage.value = ""
+		if (lib == null) {
+			errorMessage.value = "模块未加载"
+			return
+		}
+		try {
+			const value = lib.add(1, 2) as number
+			if (value == 3) {
+				result.value = "add(1, 2) = " + value + "  通过"
+			} else {
+				result.value = "add(1, 2) = " + value + "  期望 3"
+			}
+		} catch (e) {
+			console.log(e)
+			errorMessage.value = "调用失败，请查看控制台日志"
+		}
+	}
+
+	function benchmarkAdd() {
+		errorMessage.value = ""
+		if (lib == null) {
+			errorMessage.value = "模块未加载"
+			return
+		}
+		try {
+			const calls = 1000000
+			let sink = 0
+			const start = Date.now()
+			for (let i = 0; i < calls; i++) {
+				sink += (lib.add(1, 2) as number)
+			}
+			const elapsed = Date.now() - start
+			result.value = "add x " + calls + " 次: " + elapsed + " ms (sink=" + sink + ")"
+		} catch (e) {
+			console.log(e)
+			errorMessage.value = "调用失败，请查看控制台日志"
+		}
+	}
+
+	onReady(() => {
+		loadLib()
+	})
+</script>
+
+<style>
+	.page {
+		padding: 15px;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.title {
+		font-size: 18px;
+		font-weight: bold;
+		margin-bottom: 10px;
+	}
+
+	.text {
+		font-size: 13px;
+		line-height: 20px;
+		margin-bottom: 6px;
+		color: #666666;
+	}
+
+	.btn {
+		margin-top: 12px;
+	}
+
+	.result {
+		margin-top: 20px;
+		font-size: 15px;
+		color: #007aff;
+	}
+
+	.error {
+		margin-top: 20px;
+		font-size: 15px;
+		color: #ff0000;
+	}
+</style>
