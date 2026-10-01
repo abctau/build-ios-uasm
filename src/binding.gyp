@@ -1,6 +1,5 @@
 {
   'variables': {
-    'module-root-dir': '<!(node -p "require(\'path\').resolve(\'.\')")',
     'common-sources': [
       'binding.cc',
     ],
@@ -21,12 +20,8 @@
           'defines': [
             'GYP_ANDROID=1',
           ],
-          'sources': [
-            'jni_binding.cc',
-          ],
           'ldflags': [
             '-Wl,--unresolved-symbols=ignore-all',
-            '-Wl,--version-script=<(module-root-dir)/android.exports',
             # The app supplies libc++_shared.so from its native library directory.
             '-nostdlib++',
           ],
@@ -39,19 +34,11 @@
           'defines': [
             'GYP_IOS=1',
           ],
-          'sources': [
-            'swift_binding.cc',
-            'swift_binding.h',
-          ],
-          'mac_framework_headers': [
-            'swift_binding.h',
-          ],
           'xcode_settings': {
             'PRODUCT_BUNDLE_IDENTIFIER': 'uts.sdk.modules.testUasm',
           },
           'ldflags': [
             '-Wl,-undefined,dynamic_lookup',
-            '-Wl,-exported_symbols_list,<(module-root-dir)/ios.exports',
           ],
         }],
         ['OS == "harmony"', {

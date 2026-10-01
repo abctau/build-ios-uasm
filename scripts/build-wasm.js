@@ -40,7 +40,7 @@ const outJs = path.join(outDir, 'test-uasm.js')
 
 // Mirrors JS_FLAGS / LD_FLAGS / EM_FLAGS (Release) of the official Makefile.
 const args = [
-  path.join(root, 'wasm_binding.cc'),
+  path.join(root, 'src', 'wasm_binding.cc'),
   '-o', outJs,
   '--no-entry',
   '-lembind',

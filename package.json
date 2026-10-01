@@ -6,9 +6,9 @@
   "private": true,
   "gypfile": true,
   "scripts": {
-    "build:test-uasm:android:release": "uni-gyp --platform=android --depth=. --sdk-path=\"E:/hbAndroidSdk\" --ndk-path=\"E:/hbAndroidSdk/ndk/29.0.14206865\" --arch=arm64 --build Release binding.gyp && uni-gyp --platform=android --depth=. --sdk-path=\"E:/hbAndroidSdk\" --ndk-path=\"E:/hbAndroidSdk/ndk/29.0.14206865\" --arch=x64 --build Release binding.gyp",
-    "build:test-uasm:harmony:release": "set \"PATH=E:\\hbAndroidSdk\\cmake\\3.22.1\\bin;%PATH%\" && uni-gyp --platform=harmony --depth=. --ndk-path=\"C:/Program Files/Huawei/DevEco Studio/sdk/default/openharmony/native\" --arch=arm64 --build Release binding.gyp && uni-gyp --platform=harmony --depth=. --ndk-path=\"C:/Program Files/Huawei/DevEco Studio/sdk/default/openharmony/native\" --arch=x64 --build Release binding.gyp",
-    "build:test-uasm:ios:release": "uni-gyp --platform=ios --depth=. --sdk=all --arch=arm64,x64 --deployment-target=15.0 --build Release binding.gyp",
+    "build:test-uasm:android:release": "uni-gyp --platform=android --depth=. --sdk-path=\"E:/hbAndroidSdk\" --ndk-path=\"E:/hbAndroidSdk/ndk/29.0.14206865\" --arch=arm64 --build Release src/binding.gyp && uni-gyp --platform=android --depth=. --sdk-path=\"E:/hbAndroidSdk\" --ndk-path=\"E:/hbAndroidSdk/ndk/29.0.14206865\" --arch=x64 --build Release src/binding.gyp",
+    "build:test-uasm:harmony:release": "set \"PATH=E:\\hbAndroidSdk\\cmake\\3.22.1\\bin;%PATH%\" && uni-gyp --platform=harmony --depth=. --ndk-path=\"C:/Program Files/Huawei/DevEco Studio/sdk/default/openharmony/native\" --arch=arm64 --build Release src/binding.gyp && uni-gyp --platform=harmony --depth=. --ndk-path=\"C:/Program Files/Huawei/DevEco Studio/sdk/default/openharmony/native\" --arch=x64 --build Release src/binding.gyp",
+    "build:test-uasm:ios:release": "uni-gyp --platform=ios --depth=. --sdk=all --arch=arm64,x64 --deployment-target=15.0 --build Release src/binding.gyp",
     "build:test-uasm:wasm:release": "node scripts/build-wasm.js",
     "build:test-uasm:pack:uni-module:release": "uni-gyp module-pack --target test-uasm",
     "pack:test-uasm:wasm:release": "node scripts/pack-wasm.js",

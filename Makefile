@@ -88,7 +88,7 @@ BROTLI_TARGET = $(WASM_TARGET).br
 
 # Emscripten replaces the platform-specific N-API/JNI/Swift bindings with
 # wasm_binding.cc.
-CXX_SOURCES := wasm_binding.cc
+CXX_SOURCES := src/wasm_binding.cc
 OBJECTS := $(patsubst %.cc,$(OUTPUT)/%.o,$(CXX_SOURCES))
 DEPENDENCIES := $(OBJECTS:.o=.d)
 
