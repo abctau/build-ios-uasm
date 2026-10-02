@@ -1,7 +1,5 @@
 import { type ColorThiefResult } from './interface.uts'
 
-const PLUGIN_PATH = 'uni_modules/tui-color-thief-uasm'
-
 /**
  * 读取图片二进制。条件编译差异收敛在此函数内，调用方零感知。
  */
@@ -54,7 +52,7 @@ export async function getPalette(path: string, colorCount?: number): Promise<Col
 	const bytes = await readImageBytes(path)
 
 	try {
-		const lib = await uni.loadUasm(PLUGIN_PATH)
+		const lib = await uni.loadUasm('uni_modules/tui-color-thief-uasm')
 		const result = lib.getPalette(bytes, count) as ColorThiefResult
 		return result
 	} catch (e) {
