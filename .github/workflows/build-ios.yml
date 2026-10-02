@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       plugins:
-        description: 'Plugin script names to build, comma-separated (empty = ALL). e.g. "tui-zip" or "tui-color-thief,tui-zip"'
+        description: 'Plugin script names to build, comma-separated (empty = ALL). Valid: tui-color-thief, tui-zip, tui-image'
         required: false
         default: ''
 
