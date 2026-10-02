@@ -36,7 +36,9 @@ if (!fs.existsSync(empp)) {
 
 const outDir = path.join(root, 'web', 'release')
 fs.mkdirSync(outDir, { recursive: true })
-const outJs = path.join(outDir, 'tui-color-thief.js')
+// The web entry must be named after the uni_modules plugin directory:
+// uni_modules/tui-color-thief-uasm/uasm/web/tui-color-thief-uasm.js
+const outJs = path.join(outDir, 'tui-color-thief-uasm.js')
 
 const args = [
   path.join(root, 'src', 'tui-color-thief', 'wasm_binding.cc'),

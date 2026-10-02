@@ -78,6 +78,7 @@ WASM（需 emsdk，默认 `E:/emsdk`，可用环境变量 `EMSDK` 覆盖）：
 ### UASM 插件（uni-gyp/UASM 特有约定，踩坑总结）
 
 - `uni.loadUasm('uni_modules/xxx')` 的参数**必须是字符串字面量**，不能传 const 变量，否则编译报错。
+- UASM 的 Web/小程序入口 JS **必须与 uni_modules 插件目录同名**：插件 `tui-color-thief-uasm` 的入口必须是 `uasm/web/tui-color-thief-uasm.js`，否则编译报"无法加载 uasm 插件…请确认插件路径正确"。构建/打包脚本中的产物名、Makefile 的 `APP` 都遵循该规则。
 - `uni-gyp module-pack --target <kebab-名>` 会按规则 `Uasm` + PascalCase 推导产物名（如 `tui-color-thief-uasm` → `UasmTuiColorThiefUasm`），binding.gyp 的 `target_name` 必须与该推导一致，否则 module-pack 报 "No build products found"。
 - 新增原生 API 时同步修改三处：`binding.cc`（App 端）、`wasm_binding.cc`（Web/小程序端）、`uasm/index.d.ts`。
 - UASM 原生函数可接收 `Uint8Array | ArrayBuffer`（napi/embind 均支持）；WASM 端无法读文件路径，一律由前端读成二进制再传入。

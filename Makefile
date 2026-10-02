@@ -55,7 +55,7 @@ endif
 CC = emcc
 CXX = em++
 
-APP = tui-color-thief.js
+APP = tui-color-thief-uasm.js
 
 BROTLI ?= 0
 BROTLI_CMD ?= brotli

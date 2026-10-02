@@ -11,9 +11,9 @@ const root = path.resolve(__dirname, '..')
 const src = path.join(root, 'web', 'release')
 const dest = path.join(root, 'uni_modules', 'tui-color-thief-uasm', 'uasm')
 
-const APP_JS = 'tui-color-thief.js'
-const APP_WASM = 'tui-color-thief.wasm'
-const APP_WASM_BR = 'tui-color-thief.wasm.br'
+const APP_JS = 'tui-color-thief-uasm.js'
+const APP_WASM = 'tui-color-thief-uasm.wasm'
+const APP_WASM_BR = 'tui-color-thief-uasm.wasm.br'
 
 function copy(from, to) {
   fs.mkdirSync(path.dirname(to), { recursive: true })
