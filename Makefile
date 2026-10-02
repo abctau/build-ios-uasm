@@ -1,4 +1,4 @@
-# test-uasm.wasm
+# tui-color-thief.wasm
 #
 # Makefile to use with emscripten
 # See https://emscripten.org/docs/getting_started/downloads.html
@@ -55,7 +55,7 @@ endif
 CC = emcc
 CXX = em++
 
-APP = test-uasm.js
+APP = tui-color-thief.js
 
 BROTLI ?= 0
 BROTLI_CMD ?= brotli
@@ -88,11 +88,11 @@ BROTLI_TARGET = $(WASM_TARGET).br
 
 # Emscripten replaces the platform-specific N-API/JNI/Swift bindings with
 # wasm_binding.cc.
-CXX_SOURCES := src/wasm_binding.cc
+CXX_SOURCES := src/tui-color-thief/wasm_binding.cc src/tui-color-thief/color_thief.cc
 OBJECTS := $(patsubst %.cc,$(OUTPUT)/%.o,$(CXX_SOURCES))
 DEPENDENCIES := $(OBJECTS:.o=.d)
 
-COMMON_FLAGS += -MMD -MP
+COMMON_FLAGS += -MMD -MP -Isrc/tui-color-thief
 
 CXX_FLAGS += $(COMMON_FLAGS) -std=c++20
 

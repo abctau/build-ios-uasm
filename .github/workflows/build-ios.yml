@@ -20,14 +20,14 @@ jobs:
         run: npm install
 
       - name: Build iOS xcframework
-        run: npm run build:test-uasm:ios:release
+        run: npm run build:tui-color-thief:ios:release
 
       - name: Pack uni_modules
-        run: npm run build:test-uasm:pack:uni-module:release
+        run: npm run build:tui-color-thief:pack:uni-module:release
 
       - uses: actions/upload-artifact@v4
         with:
-          name: UasmTestUasm-ios
+          name: UasmTuiColorThiefUasm-ios
           path: |
             build/ios/xcframework
-            uni_modules/test-uasm/uasm/app-ios
+            uni_modules/tui-color-thief-uasm/uasm/app-ios
