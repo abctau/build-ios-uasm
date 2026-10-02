@@ -11,6 +11,12 @@
 			"style": {
 				"navigationBarTitleText": "tui-zip 测试"
 			}
+		},
+		{
+			"path": "pages/image/image",
+			"style": {
+				"navigationBarTitleText": "tui-image 测试"
+			}
 		}
 	],
 	"globalStyle": {

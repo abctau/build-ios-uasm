@@ -1,0 +1,141 @@
+import { type ImageInfoResult, type ImagePaletteResult } from '../interface.uts'
+
+/**
+ * App/小程序端实现：网络图先 downloadFile，再读文件二进制，交给 UASM 模块处理。
+ */
+
+export async function getInfo(path: string): Promise<ImageInfoResult> {
+	if (path.length == 0) {
+		throw new Error('tui-image: path is empty')
+	}
+	const bytes = await readImageBytes(path)
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-image-uasm')
+		return lib.getInfo(bytes) as ImageInfoResult
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-image: getInfo failed')
+	}
+}
+
+export async function resize(path: string, width: number, height: number, format?: string, quality?: number): Promise<Uint8Array> {
+	if (path.length == 0) {
+		throw new Error('tui-image: path is empty')
+	}
+	let fmt = 'png'
+	let q = 85
+	if (format != null) {
+		fmt = format
+	}
+	if (quality != null) {
+		q = quality
+	}
+	const bytes = await readImageBytes(path)
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-image-uasm')
+		return lib.resize(bytes, width, height, fmt, q) as Uint8Array
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-image: resize failed')
+	}
+}
+
+export async function crop(path: string, x: number, y: number, width: number, height: number, format?: string, quality?: number): Promise<Uint8Array> {
+	if (path.length == 0) {
+		throw new Error('tui-image: path is empty')
+	}
+	let fmt = 'png'
+	let q = 85
+	if (format != null) {
+		fmt = format
+	}
+	if (quality != null) {
+		q = quality
+	}
+	const bytes = await readImageBytes(path)
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-image-uasm')
+		return lib.crop(bytes, x, y, width, height, fmt, q) as Uint8Array
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-image: crop failed')
+	}
+}
+
+export async function rotate(path: string, degrees: number, format?: string, quality?: number): Promise<Uint8Array> {
+	if (path.length == 0) {
+		throw new Error('tui-image: path is empty')
+	}
+	let fmt = 'png'
+	let q = 85
+	if (format != null) {
+		fmt = format
+	}
+	if (quality != null) {
+		q = quality
+	}
+	const bytes = await readImageBytes(path)
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-image-uasm')
+		return lib.rotate(bytes, degrees, fmt, q) as Uint8Array
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-image: rotate failed')
+	}
+}
+
+export async function convert(path: string, format: string, quality?: number): Promise<Uint8Array> {
+	if (path.length == 0) {
+		throw new Error('tui-image: path is empty')
+	}
+	let q = 85
+	if (quality != null) {
+		q = quality
+	}
+	const bytes = await readImageBytes(path)
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-image-uasm')
+		return lib.convert(bytes, format, q) as Uint8Array
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-image: convert failed')
+	}
+}
+
+export async function getPalette(path: string, colorCount?: number): Promise<ImagePaletteResult> {
+	if (path.length == 0) {
+		throw new Error('tui-image: path is empty')
+	}
+	let count = 8
+	if (colorCount != null) {
+		count = colorCount
+	}
+	const bytes = await readImageBytes(path)
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-image-uasm')
+		return lib.getPalette(bytes, count) as ImagePaletteResult
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-image: extract palette failed')
+	}
+}
+
+/**
+ * [r, g, b] 转 '#rrggbb'
+ */
+export function rgbToHex(color: number[]): string {
+	if (color.length < 3) {
+		return '#000000'
+	}
+	return '#' + toHexPart(color[0]) + toHexPart(color[1]) + toHexPart(color[2])
+}
+
+function toHexPart(value: number): string {
+	let v = Math.round(value)
+	if (v < 0) v = 0
+	if (v > 255) v = 255
+	const digits = "0123456789ABCDEF"
+	const hi = Math.floor(v / 16)
+	const lo = v % 16
+	return digits.substring(hi, hi + 1) + digits.substring(lo, lo + 1)
+}

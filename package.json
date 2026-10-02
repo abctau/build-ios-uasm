@@ -21,7 +21,15 @@
     "build:tui-zip:wasm:release": "node scripts/build-wasm-tui-zip.js",
     "pack:tui-zip:wasm:release": "node scripts/pack-wasm-tui-zip.js",
     "build:tui-zip:all": "npm run build:tui-zip:android:release && npm run build:tui-zip:harmony:release && npm run build:tui-zip:ios:release && npm run build:tui-zip:pack:uni-module:release",
-    "build:tui-zip:all:wasm": "npm run build:tui-zip:wasm:release && npm run pack:tui-zip:wasm:release"
+    "build:tui-zip:all:wasm": "npm run build:tui-zip:wasm:release && npm run pack:tui-zip:wasm:release",
+    "build:tui-image:android:release": "uni-gyp --platform=android --depth=. --sdk-path=\"E:/hbAndroidSdk\" --ndk-path=\"E:/hbAndroidSdk/ndk/29.0.14206865\" --arch=arm64 --build Release src/tui-image/binding.gyp && uni-gyp --platform=android --depth=. --sdk-path=\"E:/hbAndroidSdk\" --ndk-path=\"E:/hbAndroidSdk/ndk/29.0.14206865\" --arch=x64 --build Release src/tui-image/binding.gyp",
+    "build:tui-image:harmony:release": "set \"PATH=E:\\hbAndroidSdk\\cmake\\3.22.1\\bin;%PATH%\" && uni-gyp --platform=harmony --depth=. --ndk-path=\"C:/Program Files/Huawei/DevEco Studio/sdk/default/openharmony/native\" --arch=arm64 --build Release src/tui-image/binding.gyp && uni-gyp --platform=harmony --depth=. --ndk-path=\"C:/Program Files/Huawei/DevEco Studio/sdk/default/openharmony/native\" --arch=x64 --build Release src/tui-image/binding.gyp",
+    "build:tui-image:ios:release": "uni-gyp --platform=ios --depth=. --sdk=all --arch=arm64,x64 --deployment-target=15.0 --build Release src/tui-image/binding.gyp",
+    "build:tui-image:pack:uni-module:release": "uni-gyp module-pack --target tui-image-uasm",
+    "build:tui-image:wasm:release": "node scripts/build-wasm-tui-image.js",
+    "pack:tui-image:wasm:release": "node scripts/pack-wasm-tui-image.js",
+    "build:tui-image:all": "npm run build:tui-image:android:release && npm run build:tui-image:harmony:release && npm run build:tui-image:ios:release && npm run build:tui-image:pack:uni-module:release",
+    "build:tui-image:all:wasm": "npm run build:tui-image:wasm:release && npm run pack:tui-image:wasm:release"
   },
   "dependencies": {
     "@dcloudio/uni-gyp": "^1.0.1",

@@ -20,6 +20,7 @@
 		<text class="error">{{ errorMessage }}</text>
 
 		<button class="btn" @click="goZipTest">zip 压缩解压测试（tui-zip）→</button>
+		<button class="btn" @click="goImageTest">图片处理测试（tui-image）→</button>
 	</view>
 </template>
 
@@ -33,6 +34,10 @@
 
 	function goZipTest() {
 		uni.navigateTo({ url: '/pages/zip/zip' })
+	}
+
+	function goImageTest() {
+		uni.navigateTo({ url: '/pages/image/image' })
 	}
 
 	async function testColorThief() {

@@ -1,0 +1,75 @@
+export interface ImageInfoResult {
+	/**
+	 * 图片宽度（px）
+	 */
+	width: number
+	/**
+	 * 图片高度（px）
+	 */
+	height: number
+	/**
+	 * 原始文件分量数（1=灰度 2=灰度+alpha 3=RGB 4=RGBA）
+	 */
+	channels: number
+}
+
+export interface ImagePaletteResult {
+	/**
+	 * 图片宽度（px）
+	 */
+	width: number
+	/**
+	 * 图片高度（px）
+	 */
+	height: number
+	/**
+	 * 主色 [r, g, b]，取自像素数最多的颜色桶
+	 */
+	dominant: number[]
+	/**
+	 * 调色板，按像素数降序，dominant 为第一项
+	 */
+	palette: number[][]
+	/**
+	 * 四边平均色 [上, 右, 下, 左]，每组 [r, g, b]
+	 */
+	edges: number[][]
+}
+
+/**
+ * 输出格式："png" | "jpg"
+ */
+export type ImageFormat = string
+
+export type GetImageInfo = (path: string) => Promise<ImageInfoResult>
+
+/**
+ * 缩放图片。height 传 0 时按宽度等比缩放；width 传 0 时按高度等比缩放。
+ * 返回编码后的图片字节（格式由 format 决定，默认 png）。
+ */
+export type ResizeImage = (path: string, width: number, height: number, format?: ImageFormat, quality?: number) => Promise<Uint8Array>
+
+/**
+ * 裁剪图片，区域自动收敛到图片范围内。
+ */
+export type CropImage = (path: string, x: number, y: number, width: number, height: number, format?: ImageFormat, quality?: number) => Promise<Uint8Array>
+
+/**
+ * 旋转图片，degrees 支持 90/180/270（360 的整数倍归约），顺时针。
+ */
+export type RotateImage = (path: string, degrees: number, format?: ImageFormat, quality?: number) => Promise<Uint8Array>
+
+/**
+ * 格式转换/压缩：png 无损；jpg 用 quality（1-100，默认 85），透明像素铺白底。
+ */
+export type ConvertImage = (path: string, format: ImageFormat, quality?: number) => Promise<Uint8Array>
+
+/**
+ * 提取图片主色、调色板与四边颜色（原 tui-color-thief 能力）。
+ */
+export type GetImagePalette = (path: string, colorCount?: number) => Promise<ImagePaletteResult>
+
+/**
+ * [r, g, b] 转 '#rrggbb'
+ */
+export type RgbToHex = (color: number[]) => string

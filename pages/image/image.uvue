@@ -1,0 +1,184 @@
+<template>
+	<view class="page">
+		<text class="title">tui-image-uasm 图片处理测试</text>
+		<text class="text">对 /static/logo.png 依次执行 getInfo / resize / convert / getPalette。</text>
+
+		<button class="btn" :disabled="running" @click="runTest">运行测试</button>
+
+		<view class="step" v-for="(item, i) in steps" :key="i">
+			<text class="step-name">{{ item.name }}</text>
+			<text :class="item.ok ? 'step-ok' : 'step-pending'">{{ item.detail }}</text>
+		</view>
+
+		<view class="color-row" v-if="dominantHex.length > 0">
+			<view class="color-block color-block-large" :style="'background-color: ' + dominantHex"></view>
+		</view>
+		<view class="color-row" v-if="paletteColors.length > 0">
+			<view v-for="(item, i) in paletteColors" :key="i" class="color-block color-block-small" :style="'background-color: ' + item"></view>
+		</view>
+
+		<text class="summary" v-if="summary.length > 0">{{ summary }}</text>
+		<text class="error" v-if="errorMessage.length > 0">{{ errorMessage }}</text>
+	</view>
+</template>
+
+<script setup lang="uts">
+	import { getInfo, resize, convert, getPalette, rgbToHex } from '@/uni_modules/tui-image-uasm'
+
+	type Step = {
+		name : string,
+		ok : boolean,
+		detail : string
+	}
+
+	const steps = ref<Step[]>([])
+	const dominantHex = ref("")
+	const paletteColors = ref<string[]>([])
+	const summary = ref("")
+	const errorMessage = ref("")
+	const running = ref(false)
+
+	function addStep(name : string, ok : boolean, detail : string) {
+		const list = steps.value
+		list.push({ name: name, ok: ok, detail: detail } as Step)
+		steps.value = list
+	}
+
+	async function runTest() {
+		errorMessage.value = ""
+		summary.value = ""
+		steps.value = []
+		dominantHex.value = ""
+		paletteColors.value = []
+		running.value = true
+		try {
+			const path = '/static/logo.png'
+
+			// 1. getInfo
+			const info = await getInfo(path)
+			addStep('getInfo', info.width > 0 && info.height > 0, info.width + 'x' + info.height + ' channels=' + info.channels)
+
+			// 2. resize 等比缩放
+			const png = await resize(path, 36, 0)
+			addStep('resize 36xauto', png.length > 0, '输出 ' + png.length + ' B (png)')
+
+			// 3. jpg 压缩
+			const jpg = await convert(path, 'jpg', 80)
+			addStep('convert jpg q80', jpg.length > 0, '输出 ' + jpg.length + ' B')
+
+			// 4. getPalette（原 tui-color-thief 能力）
+			const pal = await getPalette(path, 6)
+			dominantHex.value = rgbToHex(pal.dominant)
+			const palette = [] as string[]
+			for (let i = 0; i < pal.palette.length; i++) {
+				palette.push(rgbToHex(pal.palette[i]))
+			}
+			paletteColors.value = palette
+			addStep('getPalette', pal.palette.length >= 2, 'dominant=' + dominantHex.value + ' palette=' + pal.palette.length + ' 色')
+
+			const list = steps.value
+			let allPass = true
+			for (let i = 0; i < list.length; i++) {
+				if (!list[i].ok) {
+					allPass = false
+				}
+			}
+			if (allPass) {
+				summary.value = '✓ 全部 ' + list.length + ' 项通过'
+			} else {
+				errorMessage.value = '存在失败项，请查看控制台日志'
+			}
+		} catch (e) {
+			console.log(e)
+			errorMessage.value = '测试异常中断，请查看控制台日志'
+		}
+		running.value = false
+	}
+</script>
+
+<style>
+	.page {
+		padding: 15px;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.title {
+		font-size: 18px;
+		font-weight: bold;
+		margin-bottom: 10px;
+	}
+
+	.text {
+		font-size: 13px;
+		line-height: 20px;
+		margin-bottom: 6px;
+		color: #666666;
+	}
+
+	.btn {
+		margin-top: 12px;
+	}
+
+	.step {
+		margin-top: 12px;
+		padding: 10px;
+		border-radius: 6px;
+		background-color: #F5F6F8;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.step-name {
+		font-size: 14px;
+		font-weight: bold;
+		margin-bottom: 4px;
+	}
+
+	.step-ok {
+		font-size: 12px;
+		color: #34C759;
+	}
+
+	.step-pending {
+		font-size: 12px;
+		color: #FF3B30;
+	}
+
+	.color-row {
+		margin-top: 15px;
+		display: flex;
+		flex-direction: row;
+	}
+
+	.color-block {
+		width: 48px;
+		height: 48px;
+		border-radius: 6px;
+		margin-right: 8px;
+	}
+
+	.color-block-large {
+		width: 96px;
+		height: 96px;
+		border-radius: 12px;
+	}
+
+	.color-block-small {
+		width: 40px;
+		height: 40px;
+	}
+
+	.summary {
+		margin-top: 15px;
+		font-size: 14px;
+		font-weight: bold;
+		color: #34C759;
+	}
+
+	.error {
+		margin-top: 15px;
+		font-size: 13px;
+		color: #FF3B30;
+	}
+</style>

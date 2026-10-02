@@ -16,7 +16,8 @@ env:
   PLUGIN_LIST: |
     [
       {"script":"tui-color-thief","module":"tui-color-thief-uasm","artifact":"UasmTuiColorThiefUasm-ios"},
-      {"script":"tui-zip","module":"tui-zip-uasm","artifact":"UasmTuiZipUasm-ios"}
+      {"script":"tui-zip","module":"tui-zip-uasm","artifact":"UasmTuiZipUasm-ios"},
+      {"script":"tui-image","module":"tui-image-uasm","artifact":"UasmTuiImageUasm-ios"}
     ]
 
 jobs:
