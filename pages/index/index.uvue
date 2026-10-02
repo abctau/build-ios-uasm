@@ -19,45 +19,20 @@
 
 		<text class="error">{{ errorMessage }}</text>
 
-		<text class="section-title">tui-zip-uasm 压缩解压测试</text>
-		<text class="text">内存往返：zip 创建/列表/读取（含中文文件名）+ gzip 压缩解压。</text>
-
-		<button class="btn" @click="testZip">运行 zip 测试（tui-zip）</button>
-
-		<text class="result" v-if="zipResult.length > 0">{{ zipResult }}</text>
-		<text class="error">{{ zipError }}</text>
+		<button class="btn" @click="goZipTest">zip 压缩解压测试（tui-zip）→</button>
 	</view>
 </template>
 
 <script setup lang="uts">
 	import { getPalette, rgbToHex } from '@/uni_modules/tui-color-thief-uasm'
-	import { zipCreate, zipList, zipReadEntry, gzipCompress, gzipDecompress } from '@/uni_modules/tui-zip-uasm'
 
 	const dominantHex = ref("")
 	const edgeColors = ref<string[]>([])
 	const paletteColors = ref<string[]>([])
 	const errorMessage = ref("")
-	const zipResult = ref("")
-	const zipError = ref("")
 
-	function strToBytes(s: string): Uint8Array {
-		const arr = new Uint8Array(s.length)
-		for (let i = 0; i < s.length; i++) {
-			arr[i] = s.charCodeAt(i) & 0xFF
-		}
-		return arr
-	}
-
-	function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
-		if (a.length != b.length) {
-			return false
-		}
-		for (let i = 0; i < a.length; i++) {
-			if (a[i] != b[i]) {
-				return false
-			}
-		}
-		return true
+	function goZipTest() {
+		uni.navigateTo({ url: '/pages/zip/zip' })
 	}
 
 	async function testColorThief() {
@@ -84,44 +59,6 @@
 			edgeColors.value = []
 			paletteColors.value = []
 			errorMessage.value = "主色提取失败，请查看控制台日志"
-		}
-	}
-	async function testZip() {
-		zipError.value = ""
-		zipResult.value = ""
-		try {
-			// 1. zip 创建：中文文件名 + JSON 文本
-			const text = '你好，tui-zip！Hello zip!'
-			const json = '{"msg":"second entry"}'
-			const zipBytes = await zipCreate(
-				['中文文件.txt', 'data.json'],
-				[strToBytes(text), strToBytes(json)]
-			)
-
-			// 2. zip 列表
-			const names = await zipList(zipBytes)
-			const namesStr = JSON.stringify(names)
-
-			// 3. zip 读取：内容逐字节比对
-			const back = await zipReadEntry(zipBytes, '中文文件.txt')
-			const readOk = bytesEqual(back, strToBytes(text))
-
-			// 4. gzip 往返：压缩自身 zip 数据再解压比对
-			const gz = await gzipCompress(zipBytes, 9)
-			const ungz = await gzipDecompress(gz)
-			const gzipOk = bytesEqual(ungz, zipBytes)
-
-			if (!readOk || !gzipOk) {
-				zipError.value = '内容比对失败 readOk=' + readOk + ' gzipOk=' + gzipOk
-				return
-			}
-			zipResult.value = '✓ 通过 | entries=' + namesStr
-				+ ' | zip=' + zipBytes.length + 'B'
-				+ ' | gzip=' + gz.length + 'B (原 ' + zipBytes.length + 'B)'
-		} catch (e) {
-			console.log(e)
-			zipResult.value = ""
-			zipError.value = 'zip 测试失败，请查看控制台日志'
 		}
 	}
 </script>
@@ -172,18 +109,5 @@
 	.color-block-small {
 		width: 40px;
 		height: 40px;
-	}
-
-	.section-title {
-		margin-top: 30px;
-		font-size: 16px;
-		font-weight: bold;
-		margin-bottom: 10px;
-	}
-
-	.result {
-		margin-top: 12px;
-		font-size: 13px;
-		color: #007AFF;
 	}
 </style>

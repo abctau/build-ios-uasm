@@ -5,6 +5,12 @@
 			"style": {
 				"navigationBarTitleText": "uni-app x"
 			}
+		},
+		{
+			"path": "pages/zip/zip",
+			"style": {
+				"navigationBarTitleText": "tui-zip 测试"
+			}
 		}
 	],
 	"globalStyle": {

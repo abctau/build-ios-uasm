@@ -1,0 +1,179 @@
+<template>
+	<view class="page">
+		<text class="title">tui-zip-uasm 压缩解压测试</text>
+		<text class="text">纯内存往返验证：zip 创建/列表/读取（含中文文件名）+ gzip 压缩解压，全部步骤逐字节比对。</text>
+
+		<button class="btn" :disabled="running" @click="runTest">运行测试</button>
+
+		<view class="step" v-for="(item, i) in steps" :key="i">
+			<text class="step-name">{{ item.name }}</text>
+			<text :class="item.ok ? 'step-ok' : 'step-pending'">{{ item.detail }}</text>
+		</view>
+
+		<text class="summary" v-if="summary.length > 0">{{ summary }}</text>
+		<text class="error" v-if="errorMessage.length > 0">{{ errorMessage }}</text>
+	</view>
+</template>
+
+<script setup lang="uts">
+	import { zipCreate, zipList, zipReadEntry, zipExtractAll, gzipCompress, gzipDecompress } from '@/uni_modules/tui-zip-uasm'
+
+	type Step = {
+		name : string,
+		ok : boolean,
+		detail : string
+	}
+
+	const steps = ref<Step[]>([])
+	const summary = ref("")
+	const errorMessage = ref("")
+	const running = ref(false)
+
+	function strToBytes(s : string) : Uint8Array {
+		const arr = new Uint8Array(s.length)
+		for (let i = 0; i < s.length; i++) {
+			arr[i] = s.charCodeAt(i) & 0xFF
+		}
+		return arr
+	}
+
+	function bytesEqual(a : Uint8Array, b : Uint8Array) : boolean {
+		if (a.length != b.length) {
+			return false
+		}
+		for (let i = 0; i < a.length; i++) {
+			if (a[i] != b[i]) {
+				return false
+			}
+		}
+		return true
+	}
+
+	function addStep(name : string, ok : boolean, detail : string) {
+		const list = steps.value
+		list.push({ name: name, ok: ok, detail: detail } as Step)
+		steps.value = list
+	}
+
+	async function runTest() {
+		errorMessage.value = ""
+		summary.value = ""
+		steps.value = []
+		running.value = true
+		try {
+			const text = '你好，tui-zip！Hello zip!'
+			const json = '{"msg":"second entry","n":42}'
+			const textBytes = strToBytes(text)
+			const jsonBytes = strToBytes(json)
+
+			// 1. zip 创建
+			const zipBytes = await zipCreate(['中文文件.txt', 'data.json'], [textBytes, jsonBytes])
+			addStep('zipCreate', zipBytes.length > 0, '生成 ' + zipBytes.length + ' B')
+
+			// 2. zip 列表
+			const names = await zipList(zipBytes)
+			addStep('zipList', names.length == 2, JSON.stringify(names))
+
+			// 3. 单条读取（中文文件名）
+			const back = await zipReadEntry(zipBytes, '中文文件.txt')
+			const readOk = bytesEqual(back, textBytes)
+			addStep('zipReadEntry 中文文件.txt', readOk, readOk ? '内容逐字节一致' : '内容不一致')
+
+			// 4. 批量解压
+			const all = await zipExtractAll(zipBytes)
+			const allOk = all.names.length == 2
+				&& all.names[0] == '中文文件.txt'
+				&& bytesEqual(all.datas[0], textBytes)
+				&& bytesEqual(all.datas[1], jsonBytes)
+			addStep('zipExtractAll', allOk, '解出 ' + all.names.length + ' 个条目')
+
+			// 5. gzip 压缩/解压往返
+			const gz = await gzipCompress(zipBytes, 9)
+			addStep('gzipCompress', gz.length > 0, zipBytes.length + ' B → ' + gz.length + ' B (' + gz.length * 100 / zipBytes.length + '%)')
+
+			const ungz = await gzipDecompress(gz)
+			const gzipOk = bytesEqual(ungz, zipBytes)
+			addStep('gzipDecompress', gzipOk, gzipOk ? '解压后与原始 zip 逐字节一致' : '内容不一致')
+
+			const list = steps.value
+			let allPass = true
+			for (let i = 0; i < list.length; i++) {
+				if (!list[i].ok) {
+					allPass = false
+				}
+			}
+			if (allPass) {
+				summary.value = '✓ 全部 6 项通过'
+			} else {
+				errorMessage.value = '存在失败项，请查看控制台日志'
+			}
+		} catch (e) {
+			console.log(e)
+			errorMessage.value = '测试异常中断，请查看控制台日志'
+		}
+		running.value = false
+	}
+</script>
+
+<style>
+	.page {
+		padding: 15px;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.title {
+		font-size: 18px;
+		font-weight: bold;
+		margin-bottom: 10px;
+	}
+
+	.text {
+		font-size: 13px;
+		line-height: 20px;
+		margin-bottom: 6px;
+		color: #666666;
+	}
+
+	.btn {
+		margin-top: 12px;
+	}
+
+	.step {
+		margin-top: 12px;
+		padding: 10px;
+		border-radius: 6px;
+		background-color: #F5F6F8;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.step-name {
+		font-size: 14px;
+		font-weight: bold;
+		margin-bottom: 4px;
+	}
+
+	.step-ok {
+		font-size: 12px;
+		color: #34C759;
+	}
+
+	.step-pending {
+		font-size: 12px;
+		color: #FF3B30;
+	}
+
+	.summary {
+		margin-top: 15px;
+		font-size: 14px;
+		font-weight: bold;
+		color: #34C759;
+	}
+
+	.error {
+		margin-top: 15px;
+		font-size: 13px;
+		color: #FF3B30;
+	}
+</style>

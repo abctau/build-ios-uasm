@@ -7,8 +7,9 @@
 ```
 ├── main.uts / App.uvue          # uni-app x 应用入口
 ├── manifest.json                # uni-app x 应用清单（vapor: true；Android abiFilters: arm64-v8a, x86_64）
-├── pages.json                   # 页面路由配置（仅 pages/index/index）
-├── pages/index/index.uvue       # 测试页面：验证 getPalette('/static/logo.png')
+├── pages.json                   # 页面路由配置（pages/index/index 首页入口 + pages/zip/zip zip 测试页）
+├── pages/index/index.uvue       # 测试页面：验证 getPalette('/static/logo.png')，跳转 zip 测试页
+├── pages/zip/zip.uvue           # tui-zip-uasm 测试页：zip/gzip 六步内存往返逐项校验
 ├── src/tui-color-thief/         # ★ 插件 C++ 源码
 │   ├── binding.cc               # N-API 绑定（Android/iOS/Harmony 共用，C++20，禁用异常）
 │   ├── binding.gyp              # uni-gyp 构建配置（target 名 UasmTuiColorThiefUasm）
