@@ -8,6 +8,7 @@
 		<view class="step" v-for="(item, i) in steps" :key="i">
 			<text class="step-name">{{ item.name }}</text>
 			<text :class="item.ok ? 'step-ok' : 'step-pending'">{{ item.detail }}</text>
+			<image v-if="item.src.length > 0" :src="item.src" class="step-img" mode="aspectFit"></image>
 		</view>
 
 		<view class="color-row" v-if="dominantHex.length > 0">
@@ -28,7 +29,8 @@
 	type Step = {
 		name : string,
 		ok : boolean,
-		detail : string
+		detail : string,
+		src : string
 	}
 
 	const steps = ref<Step[]>([])
@@ -38,9 +40,44 @@
 	const errorMessage = ref("")
 	const running = ref(false)
 
-	function addStep(name : string, ok : boolean, detail : string) {
+	function writeBytesToTemp(name : string, bytes : Uint8Array) : Promise<string> {
+		return new Promise<string>((resolve, reject) => {
+			const filePath = uni.env.USER_DATA_PATH + '/tui-image-' + name
+			uni.getFileSystemManager().writeFile({
+				filePath: filePath,
+				data: bytes.buffer as ArrayBuffer,
+				success: () => {
+					resolve(filePath)
+				},
+				fail: (err) => {
+					reject(new Error('tui-image: write temp failed: ' + err.errMsg))
+				}
+			})
+		})
+	}
+
+	// 处理结果字节 → 可展示的图片 src：Web 用 Blob URL，App/小程序写临时文件
+	async function bytesToSrc(bytes : Uint8Array, name : string, mime : string) : Promise<string> {
+		// #ifdef WEB
+		const blob = new Blob([bytes.buffer as ArrayBuffer], { type: mime })
+		return URL.createObjectURL(blob)
+		// #endif
+		// #ifndef WEB
+		return writeBytesToTemp(name, bytes)
+		// #endif
+	}
+
+	async function addStep(name : string, ok : boolean, detail : string, bytes ?: Uint8Array, mime : string = 'image/png') {
+		let src = ''
+		if (ok && bytes != null) {
+			try {
+				src = await bytesToSrc(bytes, name, mime)
+			} catch (e) {
+				console.log(e)
+			}
+		}
 		const list = steps.value
-		list.push({ name: name, ok: ok, detail: detail } as Step)
+		list.push({ name: name, ok: ok, detail: detail, src: src } as Step)
 		steps.value = list
 	}
 
@@ -60,11 +97,11 @@
 
 			// 2. resize 等比缩放
 			const png = await resize(path, 36, 0)
-			addStep('resize 36xauto', png.length > 0, '输出 ' + png.length + ' B (png)')
+			addStep('resize 36xauto', png.length > 0, '输出 ' + png.length + ' B (png)', png)
 
 			// 3. jpg 压缩
 			const jpg = await convert(path, 'jpg', 80)
-			addStep('convert jpg q80', jpg.length > 0, '输出 ' + jpg.length + ' B')
+			addStep('convert jpg q80', jpg.length > 0, '输出 ' + jpg.length + ' B', jpg, 'image/jpeg')
 
 			// 4. getPalette（原 tui-color-thief 能力）
 			const pal = await getPalette(path, 6)
@@ -78,35 +115,35 @@
 
 			// 5. flip 水平翻转
 			const flipped = await flip(path, true, false)
-			addStep('flip', flipped.length > 0, '输出 ' + flipped.length + ' B (png)')
+			addStep('flip', flipped.length > 0, '输出 ' + flipped.length + ' B (png)', flipped)
 
 			// 6. blur 高斯模糊
 			const blurred = await blur(path, 4)
-			addStep('blur r4', blurred.length > 0, '输出 ' + blurred.length + ' B (png)')
+			addStep('blur r4', blurred.length > 0, '输出 ' + blurred.length + ' B (png)', blurred)
 
 			// 7. roundCorners 圆角
 			const rounded = await roundCorners(path, 16)
-			addStep('roundCorners r16', rounded.length > 0, '输出 ' + rounded.length + ' B (png)')
+			addStep('roundCorners r16', rounded.length > 0, '输出 ' + rounded.length + ' B (png)', rounded)
 
 			// 8. circleClip 圆形裁剪
 			const circle = await circleClip(path)
-			addStep('circleClip', circle.length > 0, '输出 ' + circle.length + ' B (png)')
+			addStep('circleClip', circle.length > 0, '输出 ' + circle.length + ' B (png)', circle)
 
 			// 9. extendFill 扩展填充（模糊海报背景）
 			const filled = await extendFill(path, 144, 144, 'vertical', '50%', 'blur', 24)
-			addStep('extendFill 144x144', filled.length > 0, '输出 ' + filled.length + ' B (png)')
+			addStep('extendFill 144x144', filled.length > 0, '输出 ' + filled.length + ' B (png)', filled)
 
 			// 10. edgeBlur 边缘模糊（主色叠加）
 			const edge = await edgeBlur(path, 12, 'vertical', [0.2, 0.6, 0.2], 0.2, true, 0.4)
-			addStep('edgeBlur', edge.length > 0, '输出 ' + edge.length + ' B (png)')
+			addStep('edgeBlur', edge.length > 0, '输出 ' + edge.length + ' B (png)', edge)
 
 			// 11. progressiveBlur 渐进式模糊
 			const prog = await progressiveBlur(path, 'down', 10, 0.3, 0.4)
-			addStep('progressiveBlur', prog.length > 0, '输出 ' + prog.length + ' B (png)')
+			addStep('progressiveBlur', prog.length > 0, '输出 ' + prog.length + ' B (png)', prog)
 
 			// 12. composite 图片合成（logo 叠加自身右下）
 			const comp = await composite(path, path, 20, 20, 80)
-			addStep('composite', comp.length > 0, '输出 ' + comp.length + ' B (png)')
+			addStep('composite', comp.length > 0, '输出 ' + comp.length + ' B (png)', comp)
 
 			const list = steps.value
 			let allPass = true
@@ -175,6 +212,14 @@
 	.step-pending {
 		font-size: 12px;
 		color: #FF3B30;
+	}
+
+	.step-img {
+		margin-top: 8px;
+		width: 240px;
+		height: 160px;
+		border-radius: 6px;
+		background-color: #ECEEF2;
 	}
 
 	.color-row {
