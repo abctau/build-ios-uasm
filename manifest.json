@@ -40,6 +40,9 @@
 					"xxhdpi": "",
 					"xxxhdpi": ""
 				}
+			},
+			"modules": {
+				"uni-ad": {}
 			}
 		}
 	},
