@@ -1,0 +1,82 @@
+import { type ColorThiefResult } from './interface.uts'
+
+const PLUGIN_PATH = 'uni_modules/tui-color-thief-uasm'
+
+/**
+ * 读取图片二进制。条件编译差异收敛在此函数内，调用方零感知。
+ */
+// #ifdef WEB
+async function readImageBytes(path: string): Promise<Uint8Array> {
+	return new Promise<Uint8Array>((resolve, reject) => {
+		uni.request<ArrayBuffer>({
+			url: path,
+			method: 'GET',
+			responseType: 'arraybuffer',
+			success: (res) => {
+				const data = res.data
+				if (data == null) {
+					reject(new Error('tui-color-thief: empty response for ' + path))
+					return
+				}
+				resolve(new Uint8Array(data))
+			},
+			fail: (err) => {
+				reject(new Error('tui-color-thief: request failed: ' + err.errMsg))
+			}
+		} as RequestOptions<ArrayBuffer>)
+	})
+}
+// #endif
+// #ifndef WEB
+async function readImageBytes(path: string): Promise<Uint8Array> {
+	const fsm = uni.getFileSystemManager()
+	const data = fsm.readFileSync(path)
+	return new Uint8Array(data as ArrayBuffer)
+}
+// #endif
+
+/**
+ * 提取图片主色、调色板与四边颜色。
+ *
+ * @param path 图片路径：/static 内置资源、uni.downloadFile 临时路径、
+ *             uni.chooseImage 结果、网络地址（需服务端允许跨域，仅 Web 端受 CORS 限制）
+ * @param colorCount 调色板颜色数，2~16，默认 8
+ */
+export async function getPalette(path: string, colorCount?: number): Promise<ColorThiefResult> {
+	if (path.length == 0) {
+		throw new Error('tui-color-thief: path is empty')
+	}
+	let count = 8
+	if (colorCount != null) {
+		count = colorCount
+	}
+
+	const bytes = await readImageBytes(path)
+
+	try {
+		const lib = await uni.loadUasm(PLUGIN_PATH)
+		const result = lib.getPalette(bytes, count) as ColorThiefResult
+		return result
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-color-thief: extract failed')
+	}
+}
+
+/**
+ * [r, g, b] 转 '#rrggbb'
+ */
+export function rgbToHex(color: number[]): string {
+	if (color.length < 3) {
+		return '#000000'
+	}
+	return '#' + toHexPart(color[0]) + toHexPart(color[1]) + toHexPart(color[2])
+}
+
+function toHexPart(value: number): string {
+	let v = Math.round(value)
+	if (v < 0) v = 0
+	if (v > 255) v = 255
+	const hex = v.toRadix(16)
+	return hex.length == 1 ? '0' + hex : hex
+}

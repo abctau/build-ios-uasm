@@ -7,13 +7,19 @@
 		<button class="btn" @click="benchmarkAdd">压测 add x 1000000 次</button>
 		<button class="btn" @click="loadLib">重新加载模块</button>
 
+		<button class="btn btn-primary" @click="testColorThief">提取图片主色（tui-color-thief）</button>
+
 		<text class="result">{{ result }}</text>
+		<text class="result">{{ paletteText }}</text>
 		<text class="error">{{ errorMessage }}</text>
 	</view>
 </template>
 
 <script setup lang="uts">
+	import { getPalette, rgbToHex } from '@/uni_modules/tui-color-thief-uasm'
+
 	const result = ref("")
+	const paletteText = ref("")
 	const errorMessage = ref("")
 
 	let lib : any = null
@@ -70,6 +76,30 @@
 		}
 	}
 
+	async function testColorThief() {
+		errorMessage.value = ""
+		try {
+			const res = await getPalette('/static/logo.png', 6)
+			let text = "主色: " + rgbToHex(res.dominant)
+			text += "  尺寸: " + res.width + "x" + res.height
+			text += "\n四边: "
+			const names = ["上", "右", "下", "左"]
+			for (let i = 0; i < res.edges.length; i++) {
+				text += names[i] + "=" + rgbToHex(res.edges[i]) + " "
+			}
+			text += "\n调色板: "
+			for (let i = 0; i < res.palette.length; i++) {
+				text += rgbToHex(res.palette[i]) + " "
+			}
+			paletteText.value = text
+			result.value = "getPalette 完成"
+		} catch (e) {
+			console.log(e)
+			paletteText.value = ""
+			errorMessage.value = "主色提取失败，请查看控制台日志"
+		}
+	}
+
 	onReady(() => {
 		loadLib()
 	})
@@ -97,6 +127,10 @@
 
 	.btn {
 		margin-top: 12px;
+	}
+
+	.btn-primary {
+		margin-top: 24px;
 	}
 
 	.result {

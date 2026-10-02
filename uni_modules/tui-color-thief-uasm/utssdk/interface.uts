@@ -1,0 +1,26 @@
+export interface ColorThiefResult {
+	/**
+	 * 图片宽度（px）
+	 */
+	width: number
+	/**
+	 * 图片高度（px）
+	 */
+	height: number
+	/**
+	 * 主色 [r, g, b]，取自像素数最多的颜色桶
+	 */
+	dominant: number[]
+	/**
+	 * 调色板，按像素数降序，dominant 为第一项
+	 */
+	palette: number[][]
+	/**
+	 * 四边平均色 [上, 右, 下, 左]，每组 [r, g, b]
+	 */
+	edges: number[][]
+}
+
+export type GetPalette = (path: string, colorCount?: number) => Promise<ColorThiefResult>
+
+export type RgbToHex = (color: number[]) => string
