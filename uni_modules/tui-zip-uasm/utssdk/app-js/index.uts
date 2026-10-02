@@ -1,0 +1,84 @@
+import { type ZipExtractResult } from '../interface.uts'
+
+/**
+ * 压缩解压实现：纯内存操作，四个平台实现一致，直接转发给 UASM 模块。
+ */
+
+export async function zipCreate(names: string[], contents: Uint8Array[]): Promise<Uint8Array> {
+	if (names.length != contents.length) {
+		throw new Error('tui-zip: names.length must equal contents.length')
+	}
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-zip-uasm')
+		return lib.zipCreate(names, contents) as Uint8Array
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-zip: create failed')
+	}
+}
+
+export async function zipList(zipBytes: Uint8Array): Promise<string[]> {
+	if (zipBytes.length == 0) {
+		throw new Error('tui-zip: zipBytes is empty')
+	}
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-zip-uasm')
+		return lib.zipList(zipBytes) as string[]
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-zip: list failed')
+	}
+}
+
+export async function zipReadEntry(zipBytes: Uint8Array, name: string): Promise<Uint8Array> {
+	if (zipBytes.length == 0) {
+		throw new Error('tui-zip: zipBytes is empty')
+	}
+	if (name.length == 0) {
+		throw new Error('tui-zip: name is empty')
+	}
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-zip-uasm')
+		return lib.zipReadEntry(zipBytes, name) as Uint8Array
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-zip: read entry failed')
+	}
+}
+
+export async function zipExtractAll(zipBytes: Uint8Array): Promise<ZipExtractResult> {
+	if (zipBytes.length == 0) {
+		throw new Error('tui-zip: zipBytes is empty')
+	}
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-zip-uasm')
+		return lib.zipExtractAll(zipBytes) as ZipExtractResult
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-zip: extract failed')
+	}
+}
+
+export async function gzipCompress(data: Uint8Array, level?: number): Promise<Uint8Array> {
+	let lvl = 6
+	if (level != null) {
+		lvl = level
+	}
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-zip-uasm')
+		return lib.gzipCompress(data, lvl) as Uint8Array
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-zip: gzip compress failed')
+	}
+}
+
+export async function gzipDecompress(data: Uint8Array): Promise<Uint8Array> {
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-zip-uasm')
+		return lib.gzipDecompress(data) as Uint8Array
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-zip: gzip decompress failed')
+	}
+}

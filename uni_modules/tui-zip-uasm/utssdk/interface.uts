@@ -1,0 +1,22 @@
+export interface ZipExtractResult {
+	/**
+	 * 条目名列表（不含目录条目）
+	 */
+	names: string[]
+	/**
+	 * 与 names 一一对应的条目内容
+	 */
+	datas: Uint8Array[]
+}
+
+export type ZipCreate = (names: string[], contents: Uint8Array[]) => Promise<Uint8Array>
+
+export type ZipList = (zipBytes: Uint8Array) => Promise<string[]>
+
+export type ZipReadEntry = (zipBytes: Uint8Array, name: string) => Promise<Uint8Array>
+
+export type ZipExtractAll = (zipBytes: Uint8Array) => Promise<ZipExtractResult>
+
+export type GzipCompress = (data: Uint8Array, level?: number) => Promise<Uint8Array>
+
+export type GzipDecompress = (data: Uint8Array) => Promise<Uint8Array>

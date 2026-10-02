@@ -15,9 +15,15 @@
 │   ├── color_thief.h/.cc        # 核心逻辑：stb_image 解码 + median-cut 量化 + 四边取色
 │   ├── wasm_binding.cc          # Emscripten 绑定（embind，仅 Web/小程序）
 │   └── stb/stb_image.h          # vendored stb_image（public domain）
+├── src/tui-zip/                 # ★ tui-zip 插件 C++ 源码（zip 打包/解压 + gzip）
+│   ├── binding.cc / wasm_binding.cc / zip_core.h/.cc
+│   ├── binding.gyp              # target 名 UasmTuiZipUasm
+│   └── vendor/                  # kuba--/zip（MIT）+ miniz amalgamation
 ├── scripts/
 │   ├── build-wasm-tui-color-thief.js   # 不依赖 make 的 WASM 构建脚本（需 EMSDK）
 │   └── pack-wasm-tui-color-thief.js    # 将 WASM 产物分发打包到 uni_modules
+│   ├── build-wasm-tui-zip.js           # tui-zip WASM 构建脚本（C++/C 分步编译再链接）
+│   └── pack-wasm-tui-zip.js            # tui-zip WASM 产物分发打包到 uni_modules
 ├── uni_modules/tui-color-thief-uasm/
 │   ├── package.json             # 插件元信息（type: uasm，打基座必需）
 │   ├── utssdk/web/index.uts     # ★ Web 端入口：fetch 读图 + loadUasm
@@ -31,10 +37,12 @@
 │       ├── app-ios/frameworks/  # UasmTuiColorThiefUasm.xcframework（由 CI 构建）
 │       ├── web/                 # tui-color-thief.js + .wasm
 │       └── mp-weixin/ mp-alipay/  # tui-color-thief.js + brotli 压缩的 .wasm.br
+├── uni_modules/tui-zip-uasm/    # ★ tui-zip 插件（结构与 color-thief 相同：package.json/utssdk 四平台/uasm 产物）
+│   └── uasm/index.d.ts          # TuiZipUasm：zipCreate/zipList/zipReadEntry/zipExtractAll/gzipCompress/gzipDecompress
 ├── web/release/                 # WASM 构建中间产物
 ├── static/                      # 静态资源（logo 等测试图片）
 ├── Makefile                     # emscripten 官方构建流程备选（emmake make）
-└── .github/workflows/build-ios.yml  # 手动触发的 iOS 构建流水线（workflow_dispatch）
+└── .github/workflows/build-ios.yml  # 手动触发的 iOS 构建流水线（workflow_dispatch；矩阵并行构建所有 tui-* 插件，inputs.plugins 可过滤）
 ```
 
 - 无自动化测试目录/框架；验证方式是运行 App/Web 后在测试页点击按钮，或使用 HBuilderX 编译校验。
@@ -49,6 +57,15 @@
 - `npm run build:tui-color-thief:ios:release` — iOS xcframework（arm64, x64，通常交给 CI）
 - `npm run build:tui-color-thief:pack:uni-module:release` — `uni-gyp module-pack` 打包 uni_modules
 - `npm run build:tui-color-thief:all` — 依次执行上述四步
+
+tui-zip（zip 打包/解压 + gzip，vendor/zip.c 依赖 `ZIP_HAVE_SYMLINK=1`）：
+
+- `npm run build:tui-zip:android:release` — Android（arm64 + x86_64）
+- `npm run build:tui-zip:harmony:release` — 鸿蒙
+- `npm run build:tui-zip:ios:release` — iOS xcframework（通常交给 CI）
+- `npm run build:tui-zip:pack:uni-module:release` — module-pack 打包
+- `npm run build:tui-zip:wasm:release` / `pack:tui-zip:wasm:release` — WASM 构建/分发（C++ 与 vendor C 分步编译再链接）
+- `npm run build:tui-zip:all` / `build:tui-zip:all:wasm` — 依次执行
 
 WASM（需 emsdk，默认 `E:/emsdk`，可用环境变量 `EMSDK` 覆盖）：
 
@@ -82,15 +99,18 @@ WASM（需 emsdk，默认 `E:/emsdk`，可用环境变量 `EMSDK` 覆盖）：
 
 - `uni.loadUasm('uni_modules/xxx')` 的参数**必须是字符串字面量**，不能传 const 变量，否则编译报错。
 - uni_modules 插件目录必须包含 `package.json`（`"type": "uasm"`，含 dcloudext/uni_modules 元信息），否则打包自定义基座时报 "Cannot find module .../package.json"；缺失时 HBuilderX 普通运行可能不报错，容易被漏掉。
-- `uasm/index.d.ts` 必须用 `export class <Pascal名>` 形式声明原生 API（类名 = 产物名去掉 Uasm 前缀后的 Pascal 名，如 `TuiColorThiefUasm`），云端编译据此生成 Kotlin 绑定类；用 `export = plugin` 形式会导致打基座报 "Unresolved reference"。
+- `uasm/index.d.ts` 必须用 `export class <Pascal名>` 形式声明原生 API（类名 = 产物名去掉 Uasm 前缀后的 Pascal 名，如 `TuiColorThiefUasm`），云端编译据此生成 Kotlin 绑定类；用 `export = plugin` 形式会导致打基座报 "Unresolved reference"。d.ts 中自定义 interface 返回类型与嵌套数组（`number[][]`）已验证可用。
 - App 端入口放 `utssdk/app-js/index.uts`（优先级高于 index.uts），参考官方 uni-sqlite 插件结构；`readFileSync` 编译为 Kotlin 时 encoding 参数无默认值会报 "No value passed"，App 端用异步 `readFile` 代替。
-- UASM 的 Web/小程序入口 JS **必须与 uni_modules 插件目录同名**：插件 `tui-color-thief-uasm` 的入口必须是 `uasm/web/tui-color-thief-uasm.js`，否则编译报"无法加载 uasm 插件…请确认插件路径正确"。构建/打包脚本中的产物名、Makefile 的 `APP` 都遵循该规则。
-- `uni-gyp module-pack --target <kebab-名>` 会按规则 `Uasm` + PascalCase 推导产物名（如 `tui-color-thief-uasm` → `UasmTuiColorThiefUasm`），binding.gyp 的 `target_name` 必须与该推导一致，否则 module-pack 报 "No build products found"。
+- UASM 的 Web/小程序入口 JS **必须与 uni_modules 插件目录同名**：插件 `tui-zip-uasm` 的入口必须是 `uasm/web/tui-zip-uasm.js`，否则编译报"无法加载 uasm 插件…请确认插件路径正确"。构建/打包脚本中的产物名、Makefile 的 `APP` 都遵循该规则。
+- `uni-gyp module-pack --target <kebab-名>` 会按规则 `Uasm` + PascalCase 推导产物名（如 `tui-zip-uasm` → `UasmTuiZipUasm`），binding.gyp 的 `target_name` 必须与该推导一致，否则 module-pack 报 "No build products found"。
 - 新增原生 API 时同步修改三处：`binding.cc`（App 端）、`wasm_binding.cc`（Web/小程序端）、`uasm/index.d.ts`。
-- UASM 原生函数可接收 `Uint8Array | ArrayBuffer`（napi/embind 均支持）；WASM 端无法读文件路径，一律由前端读成二进制再传入。
+- UASM 原生函数可接收 `Uint8Array | ArrayBuffer`（napi/embind 均支持）；返回二进制用 `napi_create_external_arraybuffer` + `napi_create_typedarray`（malloc 分配，finalize 回调 free）；embind 侧用 `typed_memory_view` + `Uint8Array.set`。
 - UASM 的 Web 端入口 JS 必须与插件目录同名（见上文），且 WASM 产物经 `uni.loadUasm` 在浏览器加载后行为与直接 import ESM 等价；调试 WASM 可用 Node 直调（`createXxxModule({ locateFile })` + 本地 http server 提供 .wasm，Node 的 fetch 不支持 file://）。
 - stb_image 不支持 ICO/ICO 内嵌位图格式，传 .ico 会报 "failed to decode image"（Web 端测试时最容易踩）；诊断可看 wasm_binding.cc 抛出的 bytes/head 信息。
 - UTS 的 `number.toRadix()` 在 web 端（vapor 编译为 JS）不存在，跨端进制转换用手写查表实现（见 utssdk/index.uts 的 toHexPart）。
+- 混编 C 静态库源码（如 vendor/zip.c）进 uni-gyp：configure 类宏必须显式定义（zip.c 依赖 `-DZIP_HAVE_SYMLINK=1` 才会 include `<unistd.h>`，否则 ftruncate/symlink/unlink 编译失败）；binding.gyp 的 `defines` 或 wasm 脚本参数里补齐。
+- em++ 会把 `.c` 当 C++ 编译（`-x c` 不可与 `-std=c++20` 全局混用）；分步编译（.cc 一次、.c 一次）再链接最稳，见 scripts/build-wasm-tui-zip.js。
+- 单头 amalgamation 库（miniz.h 声明+实现一体、符号非 static）只能在一个编译单元 include；其他 TU 需要 API 时用 extern "C" 重新声明（照抄结构体布局，见 src/tui-zip/zip_core.cc）。
 
 ### C++（src/）
 

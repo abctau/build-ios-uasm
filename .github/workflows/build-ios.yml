@@ -2,10 +2,48 @@ name: build-ios-uasm
 
 on:
   workflow_dispatch:
+    inputs:
+      plugins:
+        description: 'Plugin script names to build, comma-separated (empty = ALL). e.g. "tui-zip" or "tui-color-thief,tui-zip"'
+        required: false
+        default: ''
+
+env:
+  # Registry of all buildable plugins. Add one entry per new plugin:
+  #   script   = npm script prefix (build:<script>:ios:release)
+  #   module   = uni_modules plugin directory name
+  #   artifact = Uasm + PascalCase(kebab module name) + -ios
+  PLUGIN_LIST: |
+    [
+      {"script":"tui-color-thief","module":"tui-color-thief-uasm","artifact":"UasmTuiColorThiefUasm-ios"},
+      {"script":"tui-zip","module":"tui-zip-uasm","artifact":"UasmTuiZipUasm-ios"}
+    ]
 
 jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - name: Generate build matrix
+        id: gen
+        run: |
+          REQ="${{ github.event.inputs.plugins }}"
+          if [ -z "$REQ" ]; then
+            MATRIX=$(echo "$PLUGIN_LIST" | jq -c '{include: .}')
+          else
+            MATRIX=$(echo "$PLUGIN_LIST" | jq -c --arg req "$REQ" \
+              '{include: [.[] | select($req | split(",") | map(gsub("^ +| +$";"")) | index(.script))]}')
+          fi
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "Selected jobs: $MATRIX"
+
   ios:
+    needs: setup
     runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -19,15 +57,15 @@ jobs:
       - name: Install deps
         run: npm install
 
-      - name: Build iOS xcframework
-        run: npm run build:tui-color-thief:ios:release
+      - name: Build iOS xcframework (${{ matrix.module }})
+        run: npm run build:${{ matrix.script }}:ios:release
 
       - name: Pack uni_modules
-        run: npm run build:tui-color-thief:pack:uni-module:release
+        run: npm run build:${{ matrix.script }}:pack:uni-module:release
 
       - uses: actions/upload-artifact@v4
         with:
-          name: UasmTuiColorThiefUasm-ios
+          name: ${{ matrix.artifact }}
           path: |
             build/ios/xcframework
-            uni_modules/tui-color-thief-uasm/uasm/app-ios
+            uni_modules/${{ matrix.module }}/uasm/app-ios
