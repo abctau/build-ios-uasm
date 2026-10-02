@@ -1,19 +1,10 @@
-import { type ColorThiefResult } from './interface.uts'
+import { type ColorThiefResult } from '../interface.uts'
 
 /**
- * 读取图片二进制。条件编译差异收敛在此函数内，调用方零感知。
+ * 微信小程序端实现：网络图先 downloadFile，再读文件二进制，交给 UASM WASM 提取主色。
+ * 真机需将图片域名加入 downloadFile 合法域名列表。
  */
-// #ifdef WEB
-async function readImageBytes(path: string): Promise<Uint8Array> {
-	const res = await fetch(path)
-	if (!res.ok) {
-		throw new Error('tui-color-thief: fetch failed ' + res.status + ' for ' + path)
-	}
-	const buf = await res.arrayBuffer()
-	return new Uint8Array(buf)
-}
-// #endif
-// #ifndef WEB
+
 function downloadToTemp(url: string): Promise<string> {
 	return new Promise<string>((resolve, reject) => {
 		uni.downloadFile({
@@ -32,22 +23,33 @@ function downloadToTemp(url: string): Promise<string> {
 	})
 }
 
+function readLocalBytes(filePath: string): Promise<ArrayBuffer> {
+	return new Promise<ArrayBuffer>((resolve, reject) => {
+		uni.getFileSystemManager().readFile({
+			filePath: filePath,
+			success: (res) => {
+				resolve(res.data as ArrayBuffer)
+			},
+			fail: (err) => {
+				reject(new Error('tui-color-thief: read failed: ' + err.errMsg))
+			}
+		})
+	})
+}
+
 async function readImageBytes(path: string): Promise<Uint8Array> {
 	let localPath = path
 	if (path.startsWith('http://') || path.startsWith('https://')) {
 		localPath = await downloadToTemp(path)
 	}
-	const fsm = uni.getFileSystemManager()
-	const data = fsm.readFileSync(localPath)
-	return new Uint8Array(data as ArrayBuffer)
+	const data = await readLocalBytes(localPath)
+	return new Uint8Array(data)
 }
-// #endif
 
 /**
  * 提取图片主色、调色板与四边颜色。
  *
- * @param path 图片路径：/static 内置资源、uni.downloadFile 临时路径、
- *             uni.chooseImage 结果、网络地址（需服务端允许跨域，仅 Web 端受 CORS 限制）
+ * @param path 图片路径：/static 内置资源、临时路径、网络地址
  * @param colorCount 调色板颜色数，2~16，默认 8
  */
 export async function getPalette(path: string, colorCount?: number): Promise<ColorThiefResult> {

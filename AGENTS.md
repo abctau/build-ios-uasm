@@ -19,8 +19,11 @@
 │   ├── build-wasm-tui-color-thief.js   # 不依赖 make 的 WASM 构建脚本（需 EMSDK）
 │   └── pack-wasm-tui-color-thief.js    # 将 WASM 产物分发打包到 uni_modules
 ├── uni_modules/tui-color-thief-uasm/
-│   ├── utssdk/index.uts         # ★ 用户 API 封装层：getPalette(path)/rgbToHex，条件编译收敛于此
-│   ├── utssdk/interface.uts     # ColorThiefResult 类型定义
+│   ├── package.json             # 插件元信息（type: uasm，打基座必需）
+│   ├── utssdk/web/index.uts     # ★ Web 端入口：fetch 读图 + loadUasm
+│   ├── utssdk/app-js/index.uts  # ★ App 端入口：downloadFile + readFile + loadUasm
+│   ├── utssdk/mp-weixin/ mp-alipay/index.uts  # 小程序端入口：downloadFile + readFile（与 app-js 同构）
+│   ├── utssdk/interface.uts     # ColorThiefResult 类型定义（各平台目录共享）
 │   └── uasm/                    # 预构建产物（勿手改，由构建命令生成）
 │       ├── index.d.ts           # 原生插件类型声明（getPalette(bytes, colorCount?)）
 │       ├── app-android/libs/    # arm64-v8a、x86_64 的 .so
@@ -78,6 +81,9 @@ WASM（需 emsdk，默认 `E:/emsdk`，可用环境变量 `EMSDK` 覆盖）：
 ### UASM 插件（uni-gyp/UASM 特有约定，踩坑总结）
 
 - `uni.loadUasm('uni_modules/xxx')` 的参数**必须是字符串字面量**，不能传 const 变量，否则编译报错。
+- uni_modules 插件目录必须包含 `package.json`（`"type": "uasm"`，含 dcloudext/uni_modules 元信息），否则打包自定义基座时报 "Cannot find module .../package.json"；缺失时 HBuilderX 普通运行可能不报错，容易被漏掉。
+- `uasm/index.d.ts` 必须用 `export class <Pascal名>` 形式声明原生 API（类名 = 产物名去掉 Uasm 前缀后的 Pascal 名，如 `TuiColorThiefUasm`），云端编译据此生成 Kotlin 绑定类；用 `export = plugin` 形式会导致打基座报 "Unresolved reference"。
+- App 端入口放 `utssdk/app-js/index.uts`（优先级高于 index.uts），参考官方 uni-sqlite 插件结构；`readFileSync` 编译为 Kotlin 时 encoding 参数无默认值会报 "No value passed"，App 端用异步 `readFile` 代替。
 - UASM 的 Web/小程序入口 JS **必须与 uni_modules 插件目录同名**：插件 `tui-color-thief-uasm` 的入口必须是 `uasm/web/tui-color-thief-uasm.js`，否则编译报"无法加载 uasm 插件…请确认插件路径正确"。构建/打包脚本中的产物名、Makefile 的 `APP` 都遵循该规则。
 - `uni-gyp module-pack --target <kebab-名>` 会按规则 `Uasm` + PascalCase 推导产物名（如 `tui-color-thief-uasm` → `UasmTuiColorThiefUasm`），binding.gyp 的 `target_name` 必须与该推导一致，否则 module-pack 报 "No build products found"。
 - 新增原生 API 时同步修改三处：`binding.cc`（App 端）、`wasm_binding.cc`（Web/小程序端）、`uasm/index.d.ts`。

@@ -1,0 +1,94 @@
+import { type ColorThiefResult } from '../interface.uts'
+
+/**
+ * App 端实现：网络图先 downloadFile，再读文件二进制，交给 UASM 原生模块提取主色。
+ */
+
+function downloadToTemp(url: string): Promise<string> {
+	return new Promise<string>((resolve, reject) => {
+		uni.downloadFile({
+			url: url,
+			success: (res) => {
+				if (res.statusCode == 200) {
+					resolve(res.tempFilePath)
+				} else {
+					reject(new Error('tui-color-thief: download failed ' + res.statusCode + ' for ' + url))
+				}
+			},
+			fail: (err) => {
+				reject(new Error('tui-color-thief: download failed: ' + err.errMsg))
+			}
+		})
+	})
+}
+
+function readLocalBytes(filePath: string): Promise<ArrayBuffer> {
+	return new Promise<ArrayBuffer>((resolve, reject) => {
+		uni.getFileSystemManager().readFile({
+			filePath: filePath,
+			success: (res) => {
+				resolve(res.data as ArrayBuffer)
+			},
+			fail: (err) => {
+				reject(new Error('tui-color-thief: read failed: ' + err.errMsg))
+			}
+		})
+	})
+}
+
+async function readImageBytes(path: string): Promise<Uint8Array> {
+	let localPath = path
+	if (path.startsWith('http://') || path.startsWith('https://')) {
+		localPath = await downloadToTemp(path)
+	}
+	const data = await readLocalBytes(localPath)
+	return new Uint8Array(data)
+}
+
+/**
+ * 提取图片主色、调色板与四边颜色。
+ *
+ * @param path 图片路径：/static 内置资源、uni.downloadFile 临时路径、
+ *             uni.chooseImage 结果、网络地址
+ * @param colorCount 调色板颜色数，2~16，默认 8
+ */
+export async function getPalette(path: string, colorCount?: number): Promise<ColorThiefResult> {
+	if (path.length == 0) {
+		throw new Error('tui-color-thief: path is empty')
+	}
+	let count = 8
+	if (colorCount != null) {
+		count = colorCount
+	}
+
+	const bytes = await readImageBytes(path)
+
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-color-thief-uasm')
+		const result = lib.getPalette(bytes, count) as ColorThiefResult
+		return result
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-color-thief: extract failed')
+	}
+}
+
+/**
+ * [r, g, b] 转 '#rrggbb'
+ */
+export function rgbToHex(color: number[]): string {
+	if (color.length < 3) {
+		return '#000000'
+	}
+	return '#' + toHexPart(color[0]) + toHexPart(color[1]) + toHexPart(color[2])
+}
+
+function toHexPart(value: number): string {
+	let v = Math.round(value)
+	if (v < 0) v = 0
+	if (v > 255) v = 255
+	const digits = "0123456789ABCDEF"
+	const hi = Math.floor(v / 16)
+	const lo = v % 16
+	return digits.substring(hi, hi + 1) + digits.substring(lo, lo + 1)
+}

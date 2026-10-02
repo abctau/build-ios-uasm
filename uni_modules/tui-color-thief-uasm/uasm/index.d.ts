@@ -1,4 +1,4 @@
-interface TuiColorThiefPalette {
+export interface TuiColorThiefPalette {
 	width: number
 	height: number
 	dominant: number[]
@@ -6,10 +6,6 @@ interface TuiColorThiefPalette {
 	edges: number[][]
 }
 
-interface TuiColorThiefPlugin {
+export class TuiColorThiefUasm {
 	getPalette(bytes: Uint8Array | ArrayBuffer, colorCount?: number): TuiColorThiefPalette
 }
-
-declare const plugin: TuiColorThiefPlugin
-
-export = plugin
