@@ -48,7 +48,16 @@ emscripten::val GetPalette(emscripten::val bytes, int colorCount) {
   tui::PaletteResult palette;
   if (!tui::ExtractPaletteFromMemory(buffer.data(), static_cast<int>(buffer.size()),
                                      colorCount, palette)) {
-    emscripten::val::global("Error").new_(std::string("failed to decode image")).throw_();
+    static const char* kHex = "0123456789ABCDEF";
+    std::string info = "failed to decode image (bytes=" + std::to_string(buffer.size()) + " head=";
+    const size_t n = buffer.size() < 8 ? buffer.size() : 8;
+    for (size_t i = 0; i < n; i++) {
+      info += kHex[buffer[i] >> 4];
+      info += kHex[buffer[i] & 0xF];
+      if (i + 1 < n) info += ',';
+    }
+    info += ")";
+    emscripten::val::global("Error").new_(info).throw_();
     return emscripten::val::undefined();
   }
   return MakeResult(palette);

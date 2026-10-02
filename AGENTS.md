@@ -82,6 +82,9 @@ WASM（需 emsdk，默认 `E:/emsdk`，可用环境变量 `EMSDK` 覆盖）：
 - `uni-gyp module-pack --target <kebab-名>` 会按规则 `Uasm` + PascalCase 推导产物名（如 `tui-color-thief-uasm` → `UasmTuiColorThiefUasm`），binding.gyp 的 `target_name` 必须与该推导一致，否则 module-pack 报 "No build products found"。
 - 新增原生 API 时同步修改三处：`binding.cc`（App 端）、`wasm_binding.cc`（Web/小程序端）、`uasm/index.d.ts`。
 - UASM 原生函数可接收 `Uint8Array | ArrayBuffer`（napi/embind 均支持）；WASM 端无法读文件路径，一律由前端读成二进制再传入。
+- UASM 的 Web 端入口 JS 必须与插件目录同名（见上文），且 WASM 产物经 `uni.loadUasm` 在浏览器加载后行为与直接 import ESM 等价；调试 WASM 可用 Node 直调（`createXxxModule({ locateFile })` + 本地 http server 提供 .wasm，Node 的 fetch 不支持 file://）。
+- stb_image 不支持 ICO/ICO 内嵌位图格式，传 .ico 会报 "failed to decode image"（Web 端测试时最容易踩）；诊断可看 wasm_binding.cc 抛出的 bytes/head 信息。
+- UTS 的 `number.toRadix()` 在 web 端（vapor 编译为 JS）不存在，跨端进制转换用手写查表实现（见 utssdk/index.uts 的 toHexPart）。
 
 ### C++（src/）
 

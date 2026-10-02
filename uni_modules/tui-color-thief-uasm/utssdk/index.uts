@@ -5,24 +5,12 @@ import { type ColorThiefResult } from './interface.uts'
  */
 // #ifdef WEB
 async function readImageBytes(path: string): Promise<Uint8Array> {
-	return new Promise<Uint8Array>((resolve, reject) => {
-		uni.request<ArrayBuffer>({
-			url: path,
-			method: 'GET',
-			responseType: 'arraybuffer',
-			success: (res) => {
-				const data = res.data
-				if (data == null) {
-					reject(new Error('tui-color-thief: empty response for ' + path))
-					return
-				}
-				resolve(new Uint8Array(data))
-			},
-			fail: (err) => {
-				reject(new Error('tui-color-thief: request failed: ' + err.errMsg))
-			}
-		} as RequestOptions<ArrayBuffer>)
-	})
+	const res = await fetch(path)
+	if (!res.ok) {
+		throw new Error('tui-color-thief: fetch failed ' + res.status + ' for ' + path)
+	}
+	const buf = await res.arrayBuffer()
+	return new Uint8Array(buf)
 }
 // #endif
 // #ifndef WEB
@@ -75,6 +63,8 @@ function toHexPart(value: number): string {
 	let v = Math.round(value)
 	if (v < 0) v = 0
 	if (v > 255) v = 255
-	const hex = v.toRadix(16)
-	return hex.length == 1 ? '0' + hex : hex
+	const digits = "0123456789ABCDEF"
+	const hi = Math.floor(v / 16)
+	const lo = v % 16
+	return digits.substring(hi, hi + 1) + digits.substring(lo, lo + 1)
 }

@@ -5,7 +5,18 @@
 
 		<button class="btn" @click="testColorThief">提取图片主色（tui-color-thief）</button>
 
-		<text class="result">{{ paletteText }}</text>
+		<view class="color-row" v-if="dominantHex.length > 0">
+			<view class="color-block color-block-large" :style="'background-color: ' + dominantHex"></view>
+		</view>
+
+		<view class="color-row" v-if="edgeColors.length > 0">
+			<view v-for="(item, i) in edgeColors" :key="i" class="color-block" :style="'background-color: ' + item"></view>
+		</view>
+
+		<view class="color-row" v-if="paletteColors.length > 0">
+			<view v-for="(item, i) in paletteColors" :key="i" class="color-block color-block-small" :style="'background-color: ' + item"></view>
+		</view>
+
 		<text class="error">{{ errorMessage }}</text>
 	</view>
 </template>
@@ -13,28 +24,33 @@
 <script setup lang="uts">
 	import { getPalette, rgbToHex } from '@/uni_modules/tui-color-thief-uasm'
 
-	const paletteText = ref("")
+	const dominantHex = ref("")
+	const edgeColors = ref<string[]>([])
+	const paletteColors = ref<string[]>([])
 	const errorMessage = ref("")
 
 	async function testColorThief() {
 		errorMessage.value = ""
 		try {
-			const res = await getPalette('/static/logo.png', 6)
-			let text = "主色: " + rgbToHex(res.dominant)
-			text += "  尺寸: " + res.width + "x" + res.height
-			text += "\n四边: "
-			const names = ["上", "右", "下", "左"]
+			const res = await getPalette('https://yundie.xyz/static/template/20260620/e21c0311c60646e242926b11c91bbc1e.jpg', 6)
+			dominantHex.value = rgbToHex(res.dominant)
+
+			const edges = [] as string[]
 			for (let i = 0; i < res.edges.length; i++) {
-				text += names[i] + "=" + rgbToHex(res.edges[i]) + " "
+				edges.push(rgbToHex(res.edges[i]))
 			}
-			text += "\n调色板: "
+			edgeColors.value = edges
+
+			const palette = [] as string[]
 			for (let i = 0; i < res.palette.length; i++) {
-				text += rgbToHex(res.palette[i]) + " "
+				palette.push(rgbToHex(res.palette[i]))
 			}
-			paletteText.value = text
+			paletteColors.value = palette
 		} catch (e) {
 			console.log(e)
-			paletteText.value = ""
+			dominantHex.value = ""
+			edgeColors.value = []
+			paletteColors.value = []
 			errorMessage.value = "主色提取失败，请查看控制台日志"
 		}
 	}
@@ -64,15 +80,29 @@
 		margin-top: 12px;
 	}
 
-	.result {
-		margin-top: 20px;
-		font-size: 15px;
-		color: #007aff;
+	.color-row {
+		margin-top: 15px;
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
 	}
 
-	.error {
-		margin-top: 20px;
-		font-size: 15px;
-		color: #ff0000;
+	.color-block {
+		width: 48px;
+		height: 48px;
+		border-radius: 6px;
+		margin-right: 8px;
+		margin-bottom: 8px;
+	}
+
+	.color-block-large {
+		width: 96px;
+		height: 96px;
+		border-radius: 12px;
+	}
+
+	.color-block-small {
+		width: 40px;
+		height: 40px;
 	}
 </style>
