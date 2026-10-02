@@ -14,9 +14,31 @@ async function readImageBytes(path: string): Promise<Uint8Array> {
 }
 // #endif
 // #ifndef WEB
+function downloadToTemp(url: string): Promise<string> {
+	return new Promise<string>((resolve, reject) => {
+		uni.downloadFile({
+			url: url,
+			success: (res) => {
+				if (res.statusCode == 200) {
+					resolve(res.tempFilePath)
+				} else {
+					reject(new Error('tui-color-thief: download failed ' + res.statusCode + ' for ' + url))
+				}
+			},
+			fail: (err) => {
+				reject(new Error('tui-color-thief: download failed: ' + err.errMsg))
+			}
+		})
+	})
+}
+
 async function readImageBytes(path: string): Promise<Uint8Array> {
+	let localPath = path
+	if (path.startsWith('http://') || path.startsWith('https://')) {
+		localPath = await downloadToTemp(path)
+	}
 	const fsm = uni.getFileSystemManager()
-	const data = fsm.readFileSync(path)
+	const data = fsm.readFileSync(localPath)
 	return new Uint8Array(data as ArrayBuffer)
 }
 // #endif
