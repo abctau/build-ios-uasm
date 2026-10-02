@@ -17,6 +17,24 @@
 			"style": {
 				"navigationBarTitleText": "tui-image 测试"
 			}
+		},
+		{
+			"path": "pages/svg/svg",
+			"style": {
+				"navigationBarTitleText": "tui-svg 测试"
+			}
+		},
+		{
+			"path": "pages/pdf/pdf",
+			"style": {
+				"navigationBarTitleText": "tui-pdf 测试"
+			}
+		},
+		{
+			"path": "pages/xlsx/xlsx",
+			"style": {
+				"navigationBarTitleText": "tui-xlsx 测试"
+			}
 		}
 	],
 	"globalStyle": {

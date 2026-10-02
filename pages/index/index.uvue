@@ -21,6 +21,9 @@
 
 		<button class="btn" @click="goZipTest">zip 压缩解压测试（tui-zip）→</button>
 		<button class="btn" @click="goImageTest">图片处理测试（tui-image）→</button>
+		<button class="btn" @click="goSvgTest">SVG 渲染测试（tui-svg）→</button>
+		<button class="btn" @click="goPdfTest">PDF 生成测试（tui-pdf）→</button>
+		<button class="btn" @click="goXlsxTest">Excel 读写测试（tui-xlsx）→</button>
 	</view>
 </template>
 
@@ -38,6 +41,18 @@
 
 	function goImageTest() {
 		uni.navigateTo({ url: '/pages/image/image' })
+	}
+
+	function goSvgTest() {
+		uni.navigateTo({ url: '/pages/svg/svg' })
+	}
+
+	function goPdfTest() {
+		uni.navigateTo({ url: '/pages/pdf/pdf' })
+	}
+
+	function goXlsxTest() {
+		uni.navigateTo({ url: '/pages/xlsx/xlsx' })
 	}
 
 	async function testColorThief() {

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       plugins:
-        description: 'Plugin script names to build, comma-separated (empty = ALL). Valid: tui-color-thief, tui-zip, tui-image'
+        description: 'Plugin script names to build, comma-separated (empty = ALL). Valid: tui-color-thief, tui-zip, tui-image, tui-svg, tui-pdf, tui-xlsx'
         required: false
         default: ''
 
@@ -17,7 +17,10 @@ env:
     [
       {"script":"tui-color-thief","module":"tui-color-thief-uasm","artifact":"UasmTuiColorThiefUasm-ios"},
       {"script":"tui-zip","module":"tui-zip-uasm","artifact":"UasmTuiZipUasm-ios"},
-      {"script":"tui-image","module":"tui-image-uasm","artifact":"UasmTuiImageUasm-ios"}
+      {"script":"tui-image","module":"tui-image-uasm","artifact":"UasmTuiImageUasm-ios"},
+      {"script":"tui-svg","module":"tui-svg-uasm","artifact":"UasmTuiSvgUasm-ios"},
+      {"script":"tui-pdf","module":"tui-pdf-uasm","artifact":"UasmTuiPdfUasm-ios"},
+      {"script":"tui-xlsx","module":"tui-xlsx-uasm","artifact":"UasmTuiXlsxUasm-ios"}
     ]
 
 jobs:

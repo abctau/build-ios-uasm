@@ -1,0 +1,97 @@
+import { type SvgInfoResult } from '../interface.uts'
+
+/**
+ * App/小程序端实现：网络图先 downloadFile，再读文件二进制，交给 UASM 模块光栅化。
+ */
+
+
+function downloadToTemp(url: string): Promise<string> {
+	return new Promise<string>((resolve, reject) => {
+		uni.downloadFile({
+			url: url,
+			success: (res) => {
+				if (res.statusCode == 200) {
+					resolve(res.tempFilePath)
+				} else {
+					reject(new Error('tui-svg: download failed ' + res.statusCode + ' for ' + url))
+				}
+			},
+			fail: (err) => {
+				reject(new Error('tui-svg: download failed: ' + err.errMsg))
+			}
+		})
+	})
+}
+
+function readLocalBytes(filePath: string): Promise<ArrayBuffer> {
+	return new Promise<ArrayBuffer>((resolve, reject) => {
+		uni.getFileSystemManager().readFile({
+			filePath: filePath,
+			success: (res) => {
+				resolve(res.data as ArrayBuffer)
+			},
+			fail: (err) => {
+				reject(new Error('tui-svg: read failed: ' + err.errMsg))
+			}
+		})
+	})
+}
+
+async function readImageBytes(path: string): Promise<Uint8Array> {
+	let localPath = path
+	if (path.startsWith('http://') || path.startsWith('https://')) {
+		localPath = await downloadToTemp(path)
+	}
+	const data = await readLocalBytes(localPath)
+	return new Uint8Array(data)
+}
+
+export async function getInfo(path: string): Promise<SvgInfoResult> {
+	if (path.length == 0) {
+		throw new Error('tui-svg: path is empty')
+	}
+	const bytes = await readImageBytes(path)
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-svg-uasm')
+		return lib.getInfo(bytes) as SvgInfoResult
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-svg: getInfo failed')
+	}
+}
+
+export async function render(path: string, scale?: number): Promise<Uint8Array> {
+	if (path.length == 0) {
+		throw new Error('tui-svg: path is empty')
+	}
+	let s = 1.0
+	if (scale != null) {
+		s = scale
+	}
+	const bytes = await readImageBytes(path)
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-svg-uasm')
+		return lib.render(bytes, s) as Uint8Array
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-svg: render failed')
+	}
+}
+
+export async function renderSize(path: string, width: number, height?: number): Promise<Uint8Array> {
+	if (path.length == 0) {
+		throw new Error('tui-svg: path is empty')
+	}
+	let h = 0
+	if (height != null) {
+		h = height
+	}
+	const bytes = await readImageBytes(path)
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-svg-uasm')
+		return lib.renderSize(bytes, width, h) as Uint8Array
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-svg: renderSize failed')
+	}
+}

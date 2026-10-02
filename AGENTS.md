@@ -11,6 +11,7 @@
 ├── pages/index/index.uvue       # 测试页面：验证 getPalette('/static/logo.png')，跳转 zip 测试页
 ├── pages/zip/zip.uvue           # tui-zip-uasm 测试页：zip/gzip 六步内存往返逐项校验
 ├── pages/image/image.uvue       # tui-image-uasm 测试页：getInfo/resize/convert/getPalette 逐项校验
+├── pages/svg/svg.uvue           # tui-svg-uasm 测试页：getInfo/render/renderSize 逐项校验 + 渲染图预览
 ├── src/tui-color-thief/         # ★ 插件 C++ 源码
 │   ├── binding.cc               # N-API 绑定（Android/iOS/Harmony 共用，C++20，禁用异常）
 │   ├── binding.gyp              # uni-gyp 构建配置（target 名 UasmTuiColorThiefUasm）
@@ -25,6 +26,21 @@
 │   ├── binding.cc / wasm_binding.cc / image_core.h/.cc
 │   ├── binding.gyp              # target 名 UasmTuiImageUasm
 │   └── stb/                     # stb_image.h + stb_image_resize2.h + stb_image_write.h（IMPLEMENTATION 全在 image_core.cc）
+├── src/tui-svg/                 # ★ tui-svg 插件 C++ 源码（SVG 光栅化为 PNG）
+│   ├── binding.cc / wasm_binding.cc / svg_core.h/.cc
+│   ├── binding.gyp              # target 名 UasmTuiSvgUasm
+│   └── vendor/                  # nanosvg.h + nanosvgrast.h（public domain）+ stb_image_write.h
+├── src/tui-pdf/                 # ★ tui-pdf 插件 C++ 源码（多图合成 PDF + PDF 信息解析，无外部 PDF 库）
+│   ├── binding.cc / wasm_binding.cc / pdf_core.h/.cc
+│   ├── binding.gyp              # target 名 UasmTuiPdfUasm
+│   └── vendor/                  # miniz.h（deflate）+ stb_image.h（PNG 解码/JPEG info）
+├── src/tui-xlsx/                # ★ tui-xlsx 插件 C++ 源码（多 sheet Excel 读写，OOXML + zip）
+│   ├── binding.cc / wasm_binding.cc / xlsx_core.h/.cc
+│   ├── xlsx_json.h              # 手写 JSON 子集 parser/writer（无异常）
+│   ├── xlsx_xml.h               # 手写 XML tokenizer（实体/CDATA/注释）
+│   ├── xlsx_zip.h/.cc           # 复制自 tui-zip zip_core（裁 gzip + maxUncompressed 解压炸弹防御）
+│   ├── binding.gyp              # target 名 UasmTuiXlsxUasm
+│   └── vendor/                  # miniz.h + zip.c/zip.h（kuba--/zip，MIT）
 ├── scripts/
 │   ├── build-wasm-tui-color-thief.js   # 不依赖 make 的 WASM 构建脚本（需 EMSDK）
 │   └── pack-wasm-tui-color-thief.js    # 将 WASM 产物分发打包到 uni_modules
@@ -83,6 +99,38 @@ tui-image（缩放/裁剪/旋转/翻转/模糊/圆角/扩展填充/合成/格式
 - `npm run build:tui-image:wasm:release` / `pack:tui-image:wasm:release` — WASM 构建/分发
 - `npm run build:tui-image:all` / `build:tui-image:all:wasm` — 依次执行
 
+tui-svg（SVG 光栅化为 PNG，nanosvg + nanosvgrast 单头库）：
+
+- API 3 个：`getInfo（intrinsic 尺寸）/ render（scale 缩放）/ renderSize（指定宽高，h=0 等比）`
+- `npm run build:tui-svg:android:release` — Android（arm64 + x86_64）
+- `npm run build:tui-svg:harmony:release` — 鸿蒙
+- `npm run build:tui-svg:ios:release` — iOS xcframework（通常交给 CI）
+- `npm run build:tui-svg:pack:uni-module:release` — module-pack 打包
+- `npm run build:tui-svg:wasm:release` / `pack:tui-svg:wasm:release` — WASM 构建/分发
+- `npm run build:tui-svg:all` / `build:tui-svg:all:wasm` — 依次执行
+
+tui-pdf（多图合成 PDF + PDF 信息解析，手写 PDF writer 无外部 PDF 库）：
+
+- API 2 个：`imagesToPdf(paths, pageSize?('fit'|'a4'|'a5'|'letter'), orientation?('auto'|'portrait'|'landscape'), margin?(pt))`、`getPdfInfo(path)`、`getPdfInfoByBytes(bytes)`；JPEG 直嵌 DCTDecode（CMYK 走解码 Flate），PNG/其他 stb 解码 → RGB → miniz deflate FlateDecode
+- `npm run build:tui-pdf:android:release` — Android（arm64 + x86_64）
+- `npm run build:tui-pdf:harmony:release` — 鸿蒙
+- `npm run build:tui-pdf:ios:release` — iOS xcframework（通常交给 CI）
+- `npm run build:tui-pdf:pack:uni-module:release` — module-pack 打包
+- `npm run build:tui-pdf:wasm:release` / `pack:tui-pdf:wasm:release` — WASM 构建/分发
+- `npm run build:tui-pdf:all` / `build:tui-pdf:all:wasm` — 依次执行
+- PDF 渲染方向（PDF→图片）需要 pdfium，体积大，独立评估未做
+
+tui-xlsx（多 sheet Excel 读写，手写 OOXML 无外部 xlsx 库）：
+
+- API 2 个：`writeXlsx(sheets: {name, rows[][]})` → xlsx bytes（string/number/bool/null，inlineStr 无 sharedStrings）、`readXlsx(bytes)` → 同构 JSON（日期/公式返回原始值，样式不解析）；单条目解压上限 64MB 防解压炸弹；行上限 10 万、列 16384、总单元格 100 万
+- `npm run build:tui-xlsx:android:release` — Android（arm64 + x86_64）
+- `npm run build:tui-xlsx:harmony:release` — 鸿蒙
+- `npm run build:tui-xlsx:ios:release` — iOS xcframework（通常交给 CI）
+- `npm run build:tui-xlsx:pack:uni-module:release` — module-pack 打包
+- `npm run build:tui-xlsx:wasm:release` / `pack:tui-xlsx:wasm:release` — WASM 构建/分发
+- `npm run build:tui-xlsx:all` / `build:tui-xlsx:all:wasm` — 依次执行
+- 实现要点：手写 JSON 子集 parser（xlsx_json.h）+ XML tokenizer（xlsx_xml.h），均无异常；xlsx_zip 复制 tui-zip zip_core 后加 `zip_entry_size` 读前防御（kuba zip 的 zip_entry_read 会按声称的未压缩大小 malloc，事后检查太晚）；插件不做文件 IO，保存/加载由调用方用 uni API 完成
+
 WASM（需 emsdk，默认 `E:/emsdk`，可用环境变量 `EMSDK` 覆盖）：
 
 - `npm run build:tui-color-thief:wasm:release` — 编译 `src/tui-color-thief/` → `web/release/`
@@ -133,6 +181,13 @@ WASM（需 emsdk，默认 `E:/emsdk`，可用环境变量 `EMSDK` 覆盖）：
 - embind 的 number 参数传了数组等错类型时会被转成 **NaN 而不是抛错**（napi 会抛），调用方拿 NaN 参与计算就静默失效——C 层对浮点参数做 `std::isfinite` 防御（image_core.cc EdgeBlurImage 的 regions），测试脚本的参数个数/类型要与 wasm 绑定签名严格一致。
 - uni_modules 插件的 package.json 若带 UTF-8 BOM，vite dev 按需加载时报 `"?{\n..." is not valid JSON`（loadPackageData），页面首次 import 插件才触发，容易漏查；node 脚本生成/复制 JSON 后要验证无 BOM。
 - 胶水层 4 平台文件（web/app-js/mp-weixin/mp-alipay）除 `readImageBytes` 外完全同构：web 用 fetch，其余三端用 downloadFile+getFileSystemManager().readFile（参考 tui-color-thief app-js 实现）；批量同步时只替换 `export async function getInfo` 之后的公共段，头部 readImageBytes 各自保留。
+- nanosvg 的 `nsvgParse` **会原地修改输入字符串**（必须传可写、以 \0 结尾的副本，parse 完才能 free）；且对垃圾输入**不返回 null 而是空 image**——必须检查 `image->shapes == nullptr` 判定解析失败（svg_core.cc 的 ParseSvgCopy）。
+- nanosvgrast.h 的光栅化头文件名容易猜错：是 `nanosvgrast.h`（不是 nanosvg.raster.h），与 nanosvg.h 同在仓库 src/ 目录。
+- `nsvgRasterize` 只支持**单一等比 scale**（无 x/y 独立缩放）：renderSize 非等比时取 min(tx, ty)，内容贴左上、另一方向留透明。
+- nanosvg 已在解析期把 viewBox/内容边界回退到 image->width/height（恒 >0），无需自己处理 viewBox 回退；不支持 `<text>` 文字渲染。
+- embind **不接受原生 Uint8Array 作为 register_vector<uint8_t> 参数**（要 Uint8Vector 包装类实例）——多字节数组参数一律用 `emscripten::val` + `vecFromJSArray<uint8_t>` 手动转换（tui-pdf 的 packed+offsets 模式）。
+- Node 测试脚本同时加载多个 uasm WASM 模块时，`locateFile` 必须给每个模块返回**不同的 URL**（否则 http server 按路由返回错文件，embind 绑定静默错位、导出残缺）。
+- 多图传递约定（napi/embind 同构）：胶水层把所有图拼成一个大 Uint8Array + 平铺 offsets `[start0,len0,start1,len1,...]`，绑定层再拆分——避免 napi 遍历对象数组与 embind 嵌套 vector 的跨端差异。
 
 ### C++（src/）
 

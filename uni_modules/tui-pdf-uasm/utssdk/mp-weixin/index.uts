@@ -1,0 +1,125 @@
+import { type PdfInfoResult } from '../interface.uts'
+
+/**
+ * App/小程序端实现：网络图先 downloadFile，再读文件二进制，交给 UASM 模块合成 PDF。
+ */
+
+function downloadToTemp(url: string): Promise<string> {
+	return new Promise<string>((resolve, reject) => {
+		uni.downloadFile({
+			url: url,
+			success: (res) => {
+				if (res.statusCode == 200) {
+					resolve(res.tempFilePath)
+				} else {
+					reject(new Error('tui-pdf: download failed ' + res.statusCode + ' for ' + url))
+				}
+			},
+			fail: (err) => {
+				reject(new Error('tui-pdf: download failed: ' + err.errMsg))
+			}
+		})
+	})
+}
+
+function readLocalBytes(filePath: string): Promise<ArrayBuffer> {
+	return new Promise<ArrayBuffer>((resolve, reject) => {
+		uni.getFileSystemManager().readFile({
+			filePath: filePath,
+			success: (res) => {
+				resolve(res.data as ArrayBuffer)
+			},
+			fail: (err) => {
+				reject(new Error('tui-pdf: read failed: ' + err.errMsg))
+			}
+		})
+	})
+}
+
+async function readImageBytes(path: string): Promise<Uint8Array> {
+	const res = await fetch(path)
+	if (res == null) {
+		throw new Error('tui-pdf: fetch returned null for ' + path)
+	}
+	if (!res.ok) {
+		throw new Error('tui-pdf: fetch failed ' + res.status + ' for ' + path)
+	}
+	const buf = await res.arrayBuffer()
+	return new Uint8Array(buf)
+}
+
+/**
+ * 多图合成 PDF。pageSize: 'fit'（页面=图片尺寸，默认）| 'a4' | 'a5' | 'letter'；
+ * orientation: 'auto' | 'portrait' | 'landscape'（固定页面时生效）；
+ * margin: pt 边距（固定页面时生效）。
+ */
+export async function imagesToPdf(paths: string[], pageSize?: string, orientation?: string, margin?: number): Promise<Uint8Array> {
+	if (paths.length == 0) {
+		throw new Error('tui-pdf: paths is empty')
+	}
+	let page = 'fit'
+	if (pageSize != null) {
+		page = pageSize
+	}
+	let orient = 'auto'
+	if (orientation != null) {
+		orient = orientation
+	}
+	let m = 0
+	if (margin != null) {
+		m = margin
+	}
+	let total = 0
+	const blobs: Uint8Array[] = []
+	for (let i = 0; i < paths.length; i++) {
+		const b = await readImageBytes(paths[i])
+		blobs.push(b)
+		total += b.length
+	}
+	const packed = new Uint8Array(total)
+	const offsets: number[] = []
+	let pos = 0
+	for (let i = 0; i < blobs.length; i++) {
+		packed.set(blobs[i], pos)
+		offsets.push(pos)
+		offsets.push(blobs[i].length)
+		pos += blobs[i].length
+	}
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-pdf-uasm')
+		return lib.imagesToPdf(packed, offsets, page, orient, m) as Uint8Array
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-pdf: imagesToPdf failed')
+	}
+}
+
+export async function getPdfInfo(path: string): Promise<PdfInfoResult> {
+	if (path.length == 0) {
+		throw new Error('tui-pdf: path is empty')
+	}
+	const bytes = await readImageBytes(path)
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-pdf-uasm')
+		return lib.getPdfInfo(bytes) as PdfInfoResult
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-pdf: getPdfInfo failed')
+	}
+}
+
+/**
+ * 从 PDF 字节直接解析信息（与 getPdfInfo 等价，便于处理内存中生成的 PDF）。
+ */
+export async function getPdfInfoByBytes(bytes: Uint8Array): Promise<PdfInfoResult> {
+	if (bytes.length == 0) {
+		throw new Error('tui-pdf: bytes is empty')
+	}
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-pdf-uasm')
+		return lib.getPdfInfo(bytes) as PdfInfoResult
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-pdf: getPdfInfo failed')
+	}
+}

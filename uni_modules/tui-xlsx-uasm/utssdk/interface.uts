@@ -1,0 +1,8 @@
+export interface XlsxSheet {
+	name : string
+	rows : Array<Array<string | number | boolean | null>>
+}
+
+export interface XlsxWorkbook {
+	sheets : XlsxSheet[]
+}

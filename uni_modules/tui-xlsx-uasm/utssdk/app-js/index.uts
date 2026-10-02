@@ -1,0 +1,41 @@
+import { XlsxSheet, XlsxWorkbook } from '../interface.uts'
+
+/**
+ * Web 端实现：xlsx 生成返回二进制；xlsx 解析接收二进制。
+ * 本插件不做文件读写，保存/加载由调用方用 uni API 完成。
+ */
+
+/**
+ * 多 sheet 生成 xlsx。值支持 string / number / boolean / null（空单元格）。
+ */
+export async function writeXlsx(sheets : XlsxSheet[]) : Promise<Uint8Array> {
+	if (sheets.length == 0) {
+		throw new Error('tui-xlsx: sheets is empty')
+	}
+	const json = JSON.stringify(sheets)
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-xlsx-uasm')
+		return lib.writeXlsx(json) as Uint8Array
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-xlsx: writeXlsx failed')
+	}
+}
+
+/**
+ * 解析 xlsx 二进制为工作簿。日期/公式以原始值返回（数字或文本），样式不解析。
+ */
+export async function readXlsx(bytes : Uint8Array) : Promise<XlsxWorkbook> {
+	if (bytes.length == 0) {
+		throw new Error('tui-xlsx: bytes is empty')
+	}
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-xlsx-uasm')
+		const json = lib.readXlsx(bytes) as string
+		const parsed = JSON.parse(json) as XlsxWorkbook
+		return parsed
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-xlsx: readXlsx failed')
+	}
+}

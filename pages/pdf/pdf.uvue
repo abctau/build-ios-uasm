@@ -1,0 +1,145 @@
+<template>
+	<view class="page">
+		<text class="title">tui-pdf-uasm PDF 生成/解析测试</text>
+		<text class="text">多图合成 PDF（fit/a4）+ PDF 信息解析，逐项校验。</text>
+
+		<button class="btn" :disabled="running" @click="runTest">运行测试</button>
+
+		<view class="step" v-for="(item, i) in steps" :key="i">
+			<text class="step-name">{{ item.name }}</text>
+			<text :class="item.ok ? 'step-ok' : 'step-pending'">{{ item.detail }}</text>
+		</view>
+
+		<text class="summary" v-if="summary.length > 0">{{ summary }}</text>
+		<text class="error" v-if="errorMessage.length > 0">{{ errorMessage }}</text>
+	</view>
+</template>
+
+<script setup lang="uts">
+	import { imagesToPdf, getPdfInfo, getPdfInfoByBytes } from '@/uni_modules/tui-pdf-uasm'
+
+	type Step = {
+		name : string,
+		ok : boolean,
+		detail : string
+	}
+
+	const steps = ref<Step[]>([])
+	const summary = ref("")
+	const errorMessage = ref("")
+	const running = ref(false)
+
+	function addStep(name : string, ok : boolean, detail : string) {
+		const list = steps.value
+		list.push({ name: name, ok: ok, detail: detail } as Step)
+		steps.value = list
+	}
+
+	async function runTest() {
+		errorMessage.value = ""
+		summary.value = ""
+		steps.value = []
+		running.value = true
+		try {
+			// 1. fit 模式：两张图两页
+			const pdfFit = await imagesToPdf(['/static/tui-test-photo.jpg', '/static/logo.png'], 'fit', 'auto', 0)
+			addStep('imagesToPdf fit', pdfFit.length > 0, '输出 ' + pdfFit.length + ' B (2 页)')
+
+			// 2. 内存往返：解析刚生成的 PDF
+			const infoFit = await getPdfInfoByBytes(pdfFit)
+			addStep('解析 fit PDF', infoFit.pageCount == 2 && !infoFit.encrypted,
+				'pages=' + infoFit.pageCount + ' version=' + infoFit.version + ' encrypted=' + infoFit.encrypted)
+
+			// 3. a4 模式 + 边距
+			const pdfA4 = await imagesToPdf(['/static/tui-test-photo.jpg'], 'a4', 'auto', 24)
+			const infoA4 = await getPdfInfoByBytes(pdfA4)
+			addStep('imagesToPdf a4', pdfA4.length > 0 && infoA4.pageCount == 1,
+				'输出 ' + pdfA4.length + ' B, pages=' + infoA4.pageCount)
+
+			// 4. 解析预置 PDF（a4 3 页）
+			const infoStatic = await getPdfInfo('/static/tui-test.pdf')
+			addStep('getPdfInfo 预置 PDF', infoStatic.pageCount == 3 && infoStatic.version.length > 0,
+				'pages=' + infoStatic.pageCount + ' version=' + infoStatic.version + ' encrypted=' + infoStatic.encrypted)
+
+			const list = steps.value
+			let allPass = true
+			for (let i = 0; i < list.length; i++) {
+				if (!list[i].ok) {
+					allPass = false
+				}
+			}
+			if (allPass) {
+				summary.value = '✓ 全部 ' + list.length + ' 项通过'
+			} else {
+				errorMessage.value = '存在失败项，请查看控制台日志'
+			}
+		} catch (e) {
+			console.log(e)
+			errorMessage.value = '测试异常中断，请查看控制台日志'
+		}
+		running.value = false
+	}
+</script>
+
+<style>
+	.page {
+		padding: 15px;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.title {
+		font-size: 18px;
+		font-weight: bold;
+		margin-bottom: 10px;
+	}
+
+	.text {
+		font-size: 13px;
+		line-height: 20px;
+		margin-bottom: 6px;
+		color: #666666;
+	}
+
+	.btn {
+		margin-top: 12px;
+	}
+
+	.step {
+		margin-top: 12px;
+		padding: 10px;
+		border-radius: 6px;
+		background-color: #F5F6F8;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.step-name {
+		font-size: 14px;
+		font-weight: bold;
+		margin-bottom: 4px;
+	}
+
+	.step-ok {
+		font-size: 12px;
+		color: #34C759;
+	}
+
+	.step-pending {
+		font-size: 12px;
+		color: #FF3B30;
+	}
+
+	.summary {
+		margin-top: 15px;
+		font-size: 14px;
+		font-weight: bold;
+		color: #34C759;
+	}
+
+	.error {
+		margin-top: 15px;
+		font-size: 13px;
+		color: #FF3B30;
+	}
+</style>
