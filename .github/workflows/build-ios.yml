@@ -33,7 +33,12 @@ jobs:
             MATRIX=$(echo "$PLUGIN_LIST" | jq -c '{include: .}')
           else
             MATRIX=$(echo "$PLUGIN_LIST" | jq -c --arg req "$REQ" \
-              '{include: [.[] | select($req | split(",") | map(gsub("^ +| +$";"")) | index(.script))]}')
+              '{include: [.[] | .script as $s | select($req | split(",") | map(gsub("^ +| +$";"")) | contains([$s]))]}')
+          fi
+          COUNT=$(echo "$MATRIX" | jq '.include | length')
+          if [ "$COUNT" -eq 0 ]; then
+            echo "::error::No plugin matched input '$REQ'. Valid names: $(echo "$PLUGIN_LIST" | jq -r '[.[].script] | join(", ")')"
+            exit 1
           fi
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           echo "Selected jobs: $MATRIX"
