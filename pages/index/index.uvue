@@ -32,8 +32,8 @@
 	async function testColorThief() {
 		errorMessage.value = ""
 		try {
-			// const res = await getPalette('/static/logo.png', 6)
-			const res = await getPalette('https://yundie.xyz/static/template/20260620/e21c0311c60646e242926b11c91bbc1e.jpg', 6)
+			const res = await getPalette('/static/logo.png', 6)
+			// const res = await getPalette('https://yundie.xyz/static/template/20260620/e21c0311c60646e242926b11c91bbc1e.jpg', 6)
 			dominantHex.value = rgbToHex(res.dominant)
 
 			const edges = [] as string[]
