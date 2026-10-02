@@ -1,6 +1,7 @@
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
 
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -109,7 +110,7 @@ emscripten::val Rotate(emscripten::val bytes, int degrees, emscripten::val forma
 	std::vector<uint8_t> out;
 	if (!tui::RotateImage(buffer.data(), buffer.size(), degrees, opt, out)) {
 		emscripten::val::global("Error")
-		    .new_(std::string("failed to rotate image (degrees must be a multiple of 90)"))
+		    .new_(std::string("failed to rotate image"))
 		    .throw_();
 		return emscripten::val::undefined();
 	}
@@ -164,6 +165,183 @@ emscripten::val GetPalette(emscripten::val bytes, int colorCount) {
 	return result;
 }
 
+bool ParseHexColor(const std::string& text, int out[3]) {
+	if (text.empty()) return false;
+	const char* s = text.c_str();
+	if (s[0] == '#') s++;
+	if (std::strlen(s) != 6) return false;
+	for (int i = 0; i < 3; i++) {
+		int v = 0;
+		for (int j = 0; j < 2; j++) {
+			const char c = s[i * 2 + j];
+			int d = 0;
+			if (c >= '0' && c <= '9') d = c - '0';
+			else if (c >= 'a' && c <= 'f') d = c - 'a' + 10;
+			else if (c >= 'A' && c <= 'F') d = c - 'A' + 10;
+			else return false;
+			v = v * 16 + d;
+		}
+		out[i] = v;
+	}
+	return true;
+}
+
+int ParseDirection2(const std::string& direction) {
+	if (direction == "horizontal" || direction == "x") return 1;
+	return 0;  // vertical
+}
+
+int ParseDirection4(const std::string& direction) {
+	if (direction == "up") return 1;
+	if (direction == "right") return 2;
+	if (direction == "left") return 3;
+	return 0;  // down
+}
+
+emscripten::val Flip(emscripten::val bytes, bool horizontal, bool vertical,
+                     emscripten::val format, emscripten::val quality) {
+	const std::vector<uint8_t> buffer = RequireBytes(bytes);
+	tui::EncodeOptions opt = ParseEncodeArgs(format, quality);
+	std::vector<uint8_t> out;
+	if (!tui::FlipImage(buffer.data(), buffer.size(), horizontal, vertical, opt, out)) {
+		emscripten::val::global("Error").new_(std::string("failed to flip image")).throw_();
+		return emscripten::val::undefined();
+	}
+	return MakeBytes(out);
+}
+
+emscripten::val Blur(emscripten::val bytes, int radius, emscripten::val format,
+                     emscripten::val quality) {
+	const std::vector<uint8_t> buffer = RequireBytes(bytes);
+	tui::EncodeOptions opt = ParseEncodeArgs(format, quality);
+	std::vector<uint8_t> out;
+	if (!tui::BlurImage(buffer.data(), buffer.size(), radius, opt, out)) {
+		emscripten::val::global("Error").new_(std::string("failed to blur image")).throw_();
+		return emscripten::val::undefined();
+	}
+	return MakeBytes(out);
+}
+
+emscripten::val RoundCorners(emscripten::val bytes, int radius, emscripten::val format,
+                             emscripten::val quality) {
+	const std::vector<uint8_t> buffer = RequireBytes(bytes);
+	tui::EncodeOptions opt = ParseEncodeArgs(format, quality);
+	std::vector<uint8_t> out;
+	if (!tui::RoundCornersImage(buffer.data(), buffer.size(), radius, opt, out)) {
+		emscripten::val::global("Error").new_(std::string("failed to round corners")).throw_();
+		return emscripten::val::undefined();
+	}
+	return MakeBytes(out);
+}
+
+emscripten::val CircleClip(emscripten::val bytes, emscripten::val format,
+                           emscripten::val quality) {
+	const std::vector<uint8_t> buffer = RequireBytes(bytes);
+	tui::EncodeOptions opt = ParseEncodeArgs(format, quality);
+	std::vector<uint8_t> out;
+	if (!tui::CircleClipImage(buffer.data(), buffer.size(), opt, out)) {
+		emscripten::val::global("Error").new_(std::string("failed to circle clip")).throw_();
+		return emscripten::val::undefined();
+	}
+	return MakeBytes(out);
+}
+
+emscripten::val ExtendFill(emscripten::val bytes, int targetWidth, int targetHeight,
+                           const std::string& direction, double centerRatio,
+                           const std::string& fill, int blurRadius,
+                           emscripten::val format, emscripten::val quality) {
+	const std::vector<uint8_t> buffer = RequireBytes(bytes);
+	tui::ExtendFillOptions opts;
+	opts.targetWidth = targetWidth;
+	opts.targetHeight = targetHeight;
+	opts.direction = ParseDirection2(direction);
+	opts.centerRatio = static_cast<float>(centerRatio);
+	opts.blurRadius = blurRadius;
+	if (fill == "blur") {
+		opts.mode = tui::ExtendFillMode::BLUR;
+	} else if (fill == "edge") {
+		opts.mode = tui::ExtendFillMode::EDGE;
+	} else if (ParseHexColor(fill, opts.fillColor)) {
+		opts.mode = tui::ExtendFillMode::COLOR;
+	} else {
+		emscripten::val::global("Error")
+		    .new_(std::string("fill must be 'blur', 'edge' or '#rrggbb'"))
+		    .throw_();
+		return emscripten::val::undefined();
+	}
+	opts.encode = ParseEncodeArgs(format, quality);
+	std::vector<uint8_t> out;
+	if (!tui::ExtendFillImage(buffer.data(), buffer.size(), opts, out)) {
+		emscripten::val::global("Error")
+		    .new_(std::string("failed to extend fill image"))
+		    .throw_();
+		return emscripten::val::undefined();
+	}
+	return MakeBytes(out);
+}
+
+emscripten::val EdgeBlur(emscripten::val bytes, int radius,
+                         const std::string& direction, double r1, double r2, double r3,
+                         double transition, bool overlay, double overlayOpacity,
+                         emscripten::val format, emscripten::val quality) {
+	const std::vector<uint8_t> buffer = RequireBytes(bytes);
+	tui::EdgeBlurOptions opts;
+	opts.radius = radius;
+	opts.direction = ParseDirection2(direction);
+	opts.regions[0] = static_cast<float>(r1);
+	opts.regions[1] = static_cast<float>(r2);
+	opts.regions[2] = static_cast<float>(r3);
+	opts.transition = static_cast<float>(transition);
+	opts.overlay = overlay;
+	opts.overlayOpacity = static_cast<float>(overlayOpacity);
+	opts.encode = ParseEncodeArgs(format, quality);
+	std::vector<uint8_t> out;
+	if (!tui::EdgeBlurImage(buffer.data(), buffer.size(), opts, out)) {
+		emscripten::val::global("Error")
+		    .new_(std::string("failed to edge blur image"))
+		    .throw_();
+		return emscripten::val::undefined();
+	}
+	return MakeBytes(out);
+}
+
+emscripten::val ProgressiveBlur(emscripten::val bytes, const std::string& direction,
+                                int radius, double offset, double interpolation,
+                                emscripten::val format, emscripten::val quality) {
+	const std::vector<uint8_t> buffer = RequireBytes(bytes);
+	tui::ProgressiveBlurOptions opts;
+	opts.direction = ParseDirection4(direction);
+	opts.radius = radius;
+	opts.offset = static_cast<float>(offset);
+	opts.interpolation = static_cast<float>(interpolation);
+	opts.encode = ParseEncodeArgs(format, quality);
+	std::vector<uint8_t> out;
+	if (!tui::ProgressiveBlurImage(buffer.data(), buffer.size(), opts, out)) {
+		emscripten::val::global("Error")
+		    .new_(std::string("failed to progressive blur image"))
+		    .throw_();
+		return emscripten::val::undefined();
+	}
+	return MakeBytes(out);
+}
+
+emscripten::val Composite(emscripten::val baseBytes, emscripten::val overlayBytes,
+                          int x, int y, int alpha, emscripten::val format,
+                          emscripten::val quality) {
+	const std::vector<uint8_t> base = RequireBytes(baseBytes);
+	const std::vector<uint8_t> overlay = RequireBytes(overlayBytes);
+	tui::EncodeOptions opt = ParseEncodeArgs(format, quality);
+	std::vector<uint8_t> out;
+	if (!tui::CompositeImage(base.data(), base.size(), overlay.data(), overlay.size(),
+	                         x, y, alpha, opt, out)) {
+		emscripten::val::global("Error")
+		    .new_(std::string("failed to composite images"))
+		    .throw_();
+		return emscripten::val::undefined();
+	}
+	return MakeBytes(out);
+}
+
 }  // namespace
 
 EMSCRIPTEN_BINDINGS(tui_image_uasm_module) {
@@ -173,4 +351,12 @@ EMSCRIPTEN_BINDINGS(tui_image_uasm_module) {
 	emscripten::function("rotate", &Rotate);
 	emscripten::function("convert", &Convert);
 	emscripten::function("getPalette", &GetPalette);
+	emscripten::function("flip", &Flip);
+	emscripten::function("blur", &Blur);
+	emscripten::function("roundCorners", &RoundCorners);
+	emscripten::function("circleClip", &CircleClip);
+	emscripten::function("extendFill", &ExtendFill);
+	emscripten::function("edgeBlur", &EdgeBlur);
+	emscripten::function("progressiveBlur", &ProgressiveBlur);
+	emscripten::function("composite", &Composite);
 }

@@ -1,7 +1,7 @@
 <template>
 	<view class="page">
 		<text class="title">tui-image-uasm 图片处理测试</text>
-		<text class="text">对 /static/logo.png 依次执行 getInfo / resize / convert / getPalette。</text>
+		<text class="text">对 /static/logo.png 依次执行 12 项：getInfo / resize / convert / getPalette / flip / blur / roundCorners / circleClip / extendFill / edgeBlur / progressiveBlur / composite。</text>
 
 		<button class="btn" :disabled="running" @click="runTest">运行测试</button>
 
@@ -23,7 +23,7 @@
 </template>
 
 <script setup lang="uts">
-	import { getInfo, resize, convert, getPalette, rgbToHex } from '@/uni_modules/tui-image-uasm'
+	import { getInfo, resize, convert, getPalette, rgbToHex, flip, blur, roundCorners, circleClip, extendFill, edgeBlur, progressiveBlur, composite } from '@/uni_modules/tui-image-uasm'
 
 	type Step = {
 		name : string,
@@ -75,6 +75,38 @@
 			}
 			paletteColors.value = palette
 			addStep('getPalette', pal.palette.length >= 2, 'dominant=' + dominantHex.value + ' palette=' + pal.palette.length + ' 色')
+
+			// 5. flip 水平翻转
+			const flipped = await flip(path, true, false)
+			addStep('flip', flipped.length > 0, '输出 ' + flipped.length + ' B (png)')
+
+			// 6. blur 高斯模糊
+			const blurred = await blur(path, 4)
+			addStep('blur r4', blurred.length > 0, '输出 ' + blurred.length + ' B (png)')
+
+			// 7. roundCorners 圆角
+			const rounded = await roundCorners(path, 16)
+			addStep('roundCorners r16', rounded.length > 0, '输出 ' + rounded.length + ' B (png)')
+
+			// 8. circleClip 圆形裁剪
+			const circle = await circleClip(path)
+			addStep('circleClip', circle.length > 0, '输出 ' + circle.length + ' B (png)')
+
+			// 9. extendFill 扩展填充（模糊海报背景）
+			const filled = await extendFill(path, 144, 144, 'vertical', '50%', 'blur', 24)
+			addStep('extendFill 144x144', filled.length > 0, '输出 ' + filled.length + ' B (png)')
+
+			// 10. edgeBlur 边缘模糊（主色叠加）
+			const edge = await edgeBlur(path, 12, 'vertical', [0.2, 0.6, 0.2], 0.2, true, 0.4)
+			addStep('edgeBlur', edge.length > 0, '输出 ' + edge.length + ' B (png)')
+
+			// 11. progressiveBlur 渐进式模糊
+			const prog = await progressiveBlur(path, 'down', 10, 0.3, 0.4)
+			addStep('progressiveBlur', prog.length > 0, '输出 ' + prog.length + ' B (png)')
+
+			// 12. composite 图片合成（logo 叠加自身右下）
+			const comp = await composite(path, path, 20, 20, 80)
+			addStep('composite', comp.length > 0, '输出 ' + comp.length + ' B (png)')
 
 			const list = steps.value
 			let allPass = true

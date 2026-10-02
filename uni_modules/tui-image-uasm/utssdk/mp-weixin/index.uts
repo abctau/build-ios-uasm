@@ -4,6 +4,48 @@ import { type ImageInfoResult, type ImagePaletteResult } from '../interface.uts'
  * App/小程序端实现：网络图先 downloadFile，再读文件二进制，交给 UASM 模块处理。
  */
 
+
+function downloadToTemp(url: string): Promise<string> {
+	return new Promise<string>((resolve, reject) => {
+		uni.downloadFile({
+			url: url,
+			success: (res) => {
+				if (res.statusCode == 200) {
+					resolve(res.tempFilePath)
+				} else {
+					reject(new Error('tui-image: download failed ' + res.statusCode + ' for ' + url))
+				}
+			},
+			fail: (err) => {
+				reject(new Error('tui-image: download failed: ' + err.errMsg))
+			}
+		})
+	})
+}
+
+function readLocalBytes(filePath: string): Promise<ArrayBuffer> {
+	return new Promise<ArrayBuffer>((resolve, reject) => {
+		uni.getFileSystemManager().readFile({
+			filePath: filePath,
+			success: (res) => {
+				resolve(res.data as ArrayBuffer)
+			},
+			fail: (err) => {
+				reject(new Error('tui-image: read failed: ' + err.errMsg))
+			}
+		})
+	})
+}
+
+async function readImageBytes(path: string): Promise<Uint8Array> {
+	let localPath = path
+	if (path.startsWith('http://') || path.startsWith('https://')) {
+		localPath = await downloadToTemp(path)
+	}
+	const data = await readLocalBytes(localPath)
+	return new Uint8Array(data)
+}
+
 export async function getInfo(path: string): Promise<ImageInfoResult> {
 	if (path.length == 0) {
 		throw new Error('tui-image: path is empty')
@@ -117,6 +159,266 @@ export async function getPalette(path: string, colorCount?: number): Promise<Ima
 	} catch (e) {
 		console.log(e)
 		throw new Error('tui-image: extract palette failed')
+	}
+}
+
+export async function flip(path: string, horizontal: boolean, vertical: boolean, format?: string, quality?: number): Promise<Uint8Array> {
+	if (path.length == 0) {
+		throw new Error('tui-image: path is empty')
+	}
+	let fmt = 'png'
+	let q = 85
+	if (format != null) {
+		fmt = format
+	}
+	if (quality != null) {
+		q = quality
+	}
+	const bytes = await readImageBytes(path)
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-image-uasm')
+		return lib.flip(bytes, horizontal, vertical, fmt, q) as Uint8Array
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-image: flip failed')
+	}
+}
+
+export async function blur(path: string, radius: number, format?: string, quality?: number): Promise<Uint8Array> {
+	if (path.length == 0) {
+		throw new Error('tui-image: path is empty')
+	}
+	let fmt = 'png'
+	let q = 85
+	if (format != null) {
+		fmt = format
+	}
+	if (quality != null) {
+		q = quality
+	}
+	const bytes = await readImageBytes(path)
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-image-uasm')
+		return lib.blur(bytes, radius, fmt, q) as Uint8Array
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-image: blur failed')
+	}
+}
+
+export async function roundCorners(path: string, radius: number, format?: string, quality?: number): Promise<Uint8Array> {
+	if (path.length == 0) {
+		throw new Error('tui-image: path is empty')
+	}
+	let fmt = 'png'
+	let q = 85
+	if (format != null) {
+		fmt = format
+	}
+	if (quality != null) {
+		q = quality
+	}
+	const bytes = await readImageBytes(path)
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-image-uasm')
+		return lib.roundCorners(bytes, radius, fmt, q) as Uint8Array
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-image: roundCorners failed')
+	}
+}
+
+export async function circleClip(path: string, format?: string, quality?: number): Promise<Uint8Array> {
+	if (path.length == 0) {
+		throw new Error('tui-image: path is empty')
+	}
+	let fmt = 'png'
+	let q = 85
+	if (format != null) {
+		fmt = format
+	}
+	if (quality != null) {
+		q = quality
+	}
+	const bytes = await readImageBytes(path)
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-image-uasm')
+		return lib.circleClip(bytes, fmt, q) as Uint8Array
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-image: circleClip failed')
+	}
+}
+
+/**
+ * position 解析为原图中心比例：number = 沿扩展方向的像素位置；
+ * string = 百分比（'50%'）或像素（'50'）；缺省居中。
+ */
+function parsePosition(position: string | number | null, targetSize: number): number {
+	if (position == null) {
+		return 0.5
+	}
+	if (typeof position == 'number') {
+		if (targetSize <= 0) {
+			return 0.5
+		}
+		return position / targetSize
+	}
+	const s = position as string
+	let value = NaN
+	if (s.endsWith('%')) {
+		value = parseFloat(s.substring(0, s.length - 1))
+		if (!isNaN(value)) {
+			return value / 100
+		}
+	} else {
+		value = parseFloat(s)
+		if (!isNaN(value)) {
+			if (targetSize <= 0) {
+				return 0.5
+			}
+			return value / targetSize
+		}
+	}
+	return 0.5
+}
+
+export async function extendFill(path: string, targetWidth: number, targetHeight: number, direction?: string, position?: string | number, fill?: string, blurRadius?: number, format?: string, quality?: number): Promise<Uint8Array> {
+	if (path.length == 0) {
+		throw new Error('tui-image: path is empty')
+	}
+	let dir = 'vertical'
+	if (direction != null) {
+		dir = direction
+	}
+	let mode = 'blur'
+	if (fill != null) {
+		mode = fill
+	}
+	let radius = 24
+	if (blurRadius != null) {
+		radius = blurRadius
+	}
+	let fmt = 'png'
+	let q = 85
+	if (format != null) {
+		fmt = format
+	}
+	if (quality != null) {
+		q = quality
+	}
+	const targetSize = dir == 'horizontal' ? targetWidth : targetHeight
+	const ratio = parsePosition(position, targetSize)
+	const bytes = await readImageBytes(path)
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-image-uasm')
+		return lib.extendFill(bytes, targetWidth, targetHeight, dir, ratio, mode, radius, fmt, q) as Uint8Array
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-image: extendFill failed')
+	}
+}
+
+export async function edgeBlur(path: string, radius: number, direction?: string, regions?: number[], transition?: number, overlay?: boolean, overlayOpacity?: number, format?: string, quality?: number): Promise<Uint8Array> {
+	if (path.length == 0) {
+		throw new Error('tui-image: path is empty')
+	}
+	let dir = 'vertical'
+	if (direction != null) {
+		dir = direction
+	}
+	let r1 = 0.2
+	let r2 = 0.6
+	let r3 = 0.2
+	if (regions != null && regions.length >= 3) {
+		r1 = regions[0]
+		r2 = regions[1]
+		r3 = regions[2]
+	}
+	let trans = 0.1
+	if (transition != null) {
+		trans = transition
+	}
+	let ov = false
+	if (overlay != null) {
+		ov = overlay
+	}
+	let ovOpacity = 0.4
+	if (overlayOpacity != null) {
+		ovOpacity = overlayOpacity
+	}
+	let fmt = 'png'
+	let q = 85
+	if (format != null) {
+		fmt = format
+	}
+	if (quality != null) {
+		q = quality
+	}
+	const bytes = await readImageBytes(path)
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-image-uasm')
+		return lib.edgeBlur(bytes, radius, dir, r1, r2, r3, trans, ov, ovOpacity, fmt, q) as Uint8Array
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-image: edgeBlur failed')
+	}
+}
+
+export async function progressiveBlur(path: string, direction: string, radius: number, offset?: number, interpolation?: number, format?: string, quality?: number): Promise<Uint8Array> {
+	if (path.length == 0) {
+		throw new Error('tui-image: path is empty')
+	}
+	let off = 0
+	if (offset != null) {
+		off = offset
+	}
+	let interp = 0.4
+	if (interpolation != null) {
+		interp = interpolation
+	}
+	let fmt = 'png'
+	let q = 85
+	if (format != null) {
+		fmt = format
+	}
+	if (quality != null) {
+		q = quality
+	}
+	const bytes = await readImageBytes(path)
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-image-uasm')
+		return lib.progressiveBlur(bytes, direction, radius, off, interp, fmt, q) as Uint8Array
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-image: progressiveBlur failed')
+	}
+}
+
+export async function composite(path: string, overlayPath: string, x: number, y: number, alpha?: number, format?: string, quality?: number): Promise<Uint8Array> {
+	if (path.length == 0 || overlayPath.length == 0) {
+		throw new Error('tui-image: path is empty')
+	}
+	let a = 100
+	if (alpha != null) {
+		a = alpha
+	}
+	let fmt = 'png'
+	let q = 85
+	if (format != null) {
+		fmt = format
+	}
+	if (quality != null) {
+		q = quality
+	}
+	const bytes = await readImageBytes(path)
+	const overlayBytes = await readImageBytes(overlayPath)
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-image-uasm')
+		return lib.composite(bytes, overlayBytes, x, y, a, fmt, q) as Uint8Array
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-image: composite failed')
 	}
 }
 

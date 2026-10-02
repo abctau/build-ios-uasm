@@ -95,6 +95,38 @@ bool ParseStringArg(napi_env env, napi_value value, std::string& out, const char
 	return true;
 }
 
+bool ParseNumberArg(napi_env env, napi_value value, double& out, const char* argName) {
+	if (napi_get_value_double(env, value, &out) != napi_ok) {
+		napi_throw_type_error(env, nullptr, argName);
+		return false;
+	}
+	return true;
+}
+
+bool ParseBoolArg(napi_env env, napi_value value, bool& out, const char* argName) {
+	if (napi_get_value_bool(env, value, &out) != napi_ok) {
+		napi_throw_type_error(env, nullptr, argName);
+		return false;
+	}
+	return true;
+}
+
+bool ParseHexColor(const std::string& text, int out[3]) {
+	// accepts "#rrggbb" or "rrggbb"
+	if (text.empty()) return false;
+	const char* s = text.c_str();
+	if (s[0] == '#') s++;
+	if (std::strlen(s) != 6) return false;
+	for (int i = 0; i < 3; i++) {
+		char hex[3] = {s[i * 2], s[i * 2 + 1], '\0'};
+		char* end = nullptr;
+		const long v = std::strtol(hex, &end, 16);
+		if (end == nullptr || *end != '\0' || v < 0 || v > 255) return false;
+		out[i] = static_cast<int>(v);
+	}
+	return true;
+}
+
 bool ParseFormat(const std::string& format, tui::OutFormat& out) {
 	if (format == "png" || format == "PNG") {
 		out = tui::OutFormat::PNG;
@@ -322,7 +354,7 @@ napi_value Rotate(napi_env env, napi_callback_info info) {
 
 	std::vector<uint8_t> out;
 	if (!tui::RotateImage(bytes.data(), bytes.size(), static_cast<int>(degrees), opt, out)) {
-		napi_throw_type_error(env, nullptr, "failed to rotate image (degrees must be a multiple of 90)");
+		napi_throw_type_error(env, nullptr, "failed to rotate image");
 		return nullptr;
 	}
 	return MakeBytes(env, out);
@@ -382,6 +414,353 @@ napi_value GetPalette(napi_env env, napi_callback_info info) {
 	return MakePalette(env, palette);
 }
 
+napi_value Flip(napi_env env, napi_callback_info info) {
+	size_t argc = 5;
+	napi_value args[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+	if (napi_get_cb_info(env, info, &argc, args, nullptr, nullptr) != napi_ok || argc < 3) {
+		napi_throw_type_error(env, nullptr, "flip expects (bytes, horizontal, vertical, format?, quality?)");
+		return nullptr;
+	}
+
+	std::vector<uint8_t> bytes;
+	if (!ParseBytesArg(env, args[0], bytes, "bytes must be a Uint8Array or ArrayBuffer")) {
+		return nullptr;
+	}
+	bool horizontal = false;
+	bool vertical = false;
+	if (!ParseBoolArg(env, args[1], horizontal, "horizontal must be a boolean") ||
+	    !ParseBoolArg(env, args[2], vertical, "vertical must be a boolean")) {
+		return nullptr;
+	}
+
+	tui::EncodeOptions opt;
+	if (!ParseEncodeArgs(env, args, argc, 3, opt)) return nullptr;
+
+	std::vector<uint8_t> out;
+	if (!tui::FlipImage(bytes.data(), bytes.size(), horizontal, vertical, opt, out)) {
+		napi_throw_type_error(env, nullptr, "failed to flip image");
+		return nullptr;
+	}
+	return MakeBytes(env, out);
+}
+
+napi_value Blur(napi_env env, napi_callback_info info) {
+	size_t argc = 4;
+	napi_value args[4] = {nullptr, nullptr, nullptr, nullptr};
+	if (napi_get_cb_info(env, info, &argc, args, nullptr, nullptr) != napi_ok || argc < 2) {
+		napi_throw_type_error(env, nullptr, "blur expects (bytes, radius, format?, quality?)");
+		return nullptr;
+	}
+
+	std::vector<uint8_t> bytes;
+	if (!ParseBytesArg(env, args[0], bytes, "bytes must be a Uint8Array or ArrayBuffer")) {
+		return nullptr;
+	}
+	double radius = 0;
+	if (!ParseNumberArg(env, args[1], radius, "radius must be a number")) return nullptr;
+
+	tui::EncodeOptions opt;
+	if (!ParseEncodeArgs(env, args, argc, 2, opt)) return nullptr;
+
+	std::vector<uint8_t> out;
+	if (!tui::BlurImage(bytes.data(), bytes.size(), static_cast<int>(radius), opt, out)) {
+		napi_throw_type_error(env, nullptr, "failed to blur image");
+		return nullptr;
+	}
+	return MakeBytes(env, out);
+}
+
+napi_value RoundCorners(napi_env env, napi_callback_info info) {
+	size_t argc = 4;
+	napi_value args[4] = {nullptr, nullptr, nullptr, nullptr};
+	if (napi_get_cb_info(env, info, &argc, args, nullptr, nullptr) != napi_ok || argc < 2) {
+		napi_throw_type_error(env, nullptr, "roundCorners expects (bytes, radius, format?, quality?)");
+		return nullptr;
+	}
+
+	std::vector<uint8_t> bytes;
+	if (!ParseBytesArg(env, args[0], bytes, "bytes must be a Uint8Array or ArrayBuffer")) {
+		return nullptr;
+	}
+	double radius = 0;
+	if (!ParseNumberArg(env, args[1], radius, "radius must be a number")) return nullptr;
+
+	tui::EncodeOptions opt;
+	if (!ParseEncodeArgs(env, args, argc, 2, opt)) return nullptr;
+
+	std::vector<uint8_t> out;
+	if (!tui::RoundCornersImage(bytes.data(), bytes.size(), static_cast<int>(radius), opt, out)) {
+		napi_throw_type_error(env, nullptr, "failed to round corners");
+		return nullptr;
+	}
+	return MakeBytes(env, out);
+}
+
+napi_value CircleClip(napi_env env, napi_callback_info info) {
+	size_t argc = 3;
+	napi_value args[3] = {nullptr, nullptr, nullptr};
+	if (napi_get_cb_info(env, info, &argc, args, nullptr, nullptr) != napi_ok || argc < 1) {
+		napi_throw_type_error(env, nullptr, "circleClip expects (bytes, format?, quality?)");
+		return nullptr;
+	}
+
+	std::vector<uint8_t> bytes;
+	if (!ParseBytesArg(env, args[0], bytes, "bytes must be a Uint8Array or ArrayBuffer")) {
+		return nullptr;
+	}
+
+	tui::EncodeOptions opt;
+	if (!ParseEncodeArgs(env, args, argc, 1, opt)) return nullptr;
+
+	std::vector<uint8_t> out;
+	if (!tui::CircleClipImage(bytes.data(), bytes.size(), opt, out)) {
+		napi_throw_type_error(env, nullptr, "failed to circle clip");
+		return nullptr;
+	}
+	return MakeBytes(env, out);
+}
+
+napi_value ExtendFill(napi_env env, napi_callback_info info) {
+	size_t argc = 9;
+	napi_value args[9] = {};
+	if (napi_get_cb_info(env, info, &argc, args, nullptr, nullptr) != napi_ok || argc < 3) {
+		napi_throw_type_error(env, nullptr,
+		                      "extendFill expects (bytes, targetWidth, targetHeight, direction?, "
+		                      "centerRatio?, fill?, blurRadius?, format?, quality?)");
+		return nullptr;
+	}
+
+	std::vector<uint8_t> bytes;
+	if (!ParseBytesArg(env, args[0], bytes, "bytes must be a Uint8Array or ArrayBuffer")) {
+		return nullptr;
+	}
+	double targetWidth = 0;
+	double targetHeight = 0;
+	if (!ParseNumberArg(env, args[1], targetWidth, "targetWidth must be a number") ||
+	    !ParseNumberArg(env, args[2], targetHeight, "targetHeight must be a number")) {
+		return nullptr;
+	}
+
+	tui::ExtendFillOptions opts;
+	opts.targetWidth = static_cast<int>(targetWidth);
+	opts.targetHeight = static_cast<int>(targetHeight);
+
+	if (argc > 3 && args[3] != nullptr) {
+		std::string direction;
+		if (!ParseStringArg(env, args[3], direction, "direction must be a string")) return nullptr;
+		if (direction == "horizontal" || direction == "x") {
+			opts.direction = 1;
+		} else if (direction == "vertical" || direction == "y") {
+			opts.direction = 0;
+		} else {
+			napi_throw_type_error(env, nullptr, "direction must be 'vertical' or 'horizontal'");
+			return nullptr;
+		}
+	}
+	if (argc > 4 && args[4] != nullptr) {
+		double ratio = 0.5;
+		if (!ParseNumberArg(env, args[4], ratio, "centerRatio must be a number")) return nullptr;
+		opts.centerRatio = static_cast<float>(ratio);
+	}
+	if (argc > 5 && args[5] != nullptr) {
+		std::string fill;
+		if (!ParseStringArg(env, args[5], fill, "fill must be a string")) return nullptr;
+		if (fill == "blur") {
+			opts.mode = tui::ExtendFillMode::BLUR;
+		} else if (fill == "edge") {
+			opts.mode = tui::ExtendFillMode::EDGE;
+		} else if (ParseHexColor(fill, opts.fillColor)) {
+			opts.mode = tui::ExtendFillMode::COLOR;
+		} else {
+			napi_throw_type_error(env, nullptr, "fill must be 'blur', 'edge' or '#rrggbb'");
+			return nullptr;
+		}
+	}
+	if (argc > 6 && args[6] != nullptr) {
+		double blurRadius = 0;
+		if (!ParseNumberArg(env, args[6], blurRadius, "blurRadius must be a number")) return nullptr;
+		opts.blurRadius = static_cast<int>(blurRadius);
+	}
+	if (!ParseEncodeArgs(env, args, argc, 7, opts.encode)) return nullptr;
+
+	std::vector<uint8_t> out;
+	if (!tui::ExtendFillImage(bytes.data(), bytes.size(), opts, out)) {
+		napi_throw_type_error(env, nullptr, "failed to extend fill image");
+		return nullptr;
+	}
+	return MakeBytes(env, out);
+}
+
+bool ParseDirection2(napi_env env, napi_value value, int& out) {
+	std::string direction;
+	if (!ParseStringArg(env, value, direction, "direction must be a string")) return false;
+	if (direction == "vertical" || direction == "y") {
+		out = 0;
+	} else if (direction == "horizontal" || direction == "x") {
+		out = 1;
+	} else {
+		napi_throw_type_error(env, nullptr, "direction must be 'vertical' or 'horizontal'");
+		return false;
+	}
+	return true;
+}
+
+napi_value EdgeBlur(napi_env env, napi_callback_info info) {
+	size_t argc = 10;
+	napi_value args[10] = {};
+	if (napi_get_cb_info(env, info, &argc, args, nullptr, nullptr) != napi_ok || argc < 2) {
+		napi_throw_type_error(env, nullptr,
+		                      "edgeBlur expects (bytes, radius, direction?, regions?, "
+		                      "transition?, overlay?, overlayOpacity?, format?, quality?)");
+		return nullptr;
+	}
+
+	std::vector<uint8_t> bytes;
+	if (!ParseBytesArg(env, args[0], bytes, "bytes must be a Uint8Array or ArrayBuffer")) {
+		return nullptr;
+	}
+	double radius = 0;
+	if (!ParseNumberArg(env, args[1], radius, "radius must be a number")) return nullptr;
+
+	tui::EdgeBlurOptions opts;
+	opts.radius = static_cast<int>(radius);
+
+	if (argc > 2 && args[2] != nullptr) {
+		if (!ParseDirection2(env, args[2], opts.direction)) return nullptr;
+	}
+	if (argc > 3 && args[3] != nullptr) {
+		bool isArray = false;
+		if (napi_is_array(env, args[3], &isArray) != napi_ok || !isArray) {
+			napi_throw_type_error(env, nullptr, "regions must be an array of 3 numbers");
+			return nullptr;
+		}
+		for (uint32_t i = 0; i < 3; i++) {
+			napi_value item = nullptr;
+			double v = 0;
+			if (napi_get_element(env, args[3], i, &item) != napi_ok ||
+			    !ParseNumberArg(env, item, v, "regions must be an array of 3 numbers")) {
+				return nullptr;
+			}
+			opts.regions[i] = static_cast<float>(v);
+		}
+	}
+	if (argc > 4 && args[4] != nullptr) {
+		double transition = 0;
+		if (!ParseNumberArg(env, args[4], transition, "transition must be a number")) return nullptr;
+		opts.transition = static_cast<float>(transition);
+	}
+	if (argc > 5 && args[5] != nullptr) {
+		if (!ParseBoolArg(env, args[5], opts.overlay, "overlay must be a boolean")) return nullptr;
+	}
+	if (argc > 6 && args[6] != nullptr) {
+		double opacity = 0;
+		if (!ParseNumberArg(env, args[6], opacity, "overlayOpacity must be a number")) return nullptr;
+		opts.overlayOpacity = static_cast<float>(opacity);
+	}
+	if (!ParseEncodeArgs(env, args, argc, 7, opts.encode)) return nullptr;
+
+	std::vector<uint8_t> out;
+	if (!tui::EdgeBlurImage(bytes.data(), bytes.size(), opts, out)) {
+		napi_throw_type_error(env, nullptr, "failed to edge blur image");
+		return nullptr;
+	}
+	return MakeBytes(env, out);
+}
+
+napi_value ProgressiveBlur(napi_env env, napi_callback_info info) {
+	size_t argc = 7;
+	napi_value args[7] = {};
+	if (napi_get_cb_info(env, info, &argc, args, nullptr, nullptr) != napi_ok || argc < 3) {
+		napi_throw_type_error(env, nullptr,
+		                      "progressiveBlur expects (bytes, direction, radius, offset?, "
+		                      "interpolation?, format?, quality?)");
+		return nullptr;
+	}
+
+	std::vector<uint8_t> bytes;
+	if (!ParseBytesArg(env, args[0], bytes, "bytes must be a Uint8Array or ArrayBuffer")) {
+		return nullptr;
+	}
+
+	tui::ProgressiveBlurOptions opts;
+	std::string direction;
+	if (!ParseStringArg(env, args[1], direction, "direction must be a string")) return nullptr;
+	if (direction == "down") {
+		opts.direction = 0;
+	} else if (direction == "up") {
+		opts.direction = 1;
+	} else if (direction == "right") {
+		opts.direction = 2;
+	} else if (direction == "left") {
+		opts.direction = 3;
+	} else {
+		napi_throw_type_error(env, nullptr, "direction must be 'down'|'up'|'right'|'left'");
+		return nullptr;
+	}
+	double radius = 0;
+	if (!ParseNumberArg(env, args[2], radius, "radius must be a number")) return nullptr;
+	opts.radius = static_cast<int>(radius);
+
+	if (argc > 3 && args[3] != nullptr) {
+		double offset = 0;
+		if (!ParseNumberArg(env, args[3], offset, "offset must be a number")) return nullptr;
+		opts.offset = static_cast<float>(offset);
+	}
+	if (argc > 4 && args[4] != nullptr) {
+		double interp = 0;
+		if (!ParseNumberArg(env, args[4], interp, "interpolation must be a number")) return nullptr;
+		opts.interpolation = static_cast<float>(interp);
+	}
+	if (!ParseEncodeArgs(env, args, argc, 5, opts.encode)) return nullptr;
+
+	std::vector<uint8_t> out;
+	if (!tui::ProgressiveBlurImage(bytes.data(), bytes.size(), opts, out)) {
+		napi_throw_type_error(env, nullptr, "failed to progressive blur image");
+		return nullptr;
+	}
+	return MakeBytes(env, out);
+}
+
+napi_value Composite(napi_env env, napi_callback_info info) {
+	size_t argc = 7;
+	napi_value args[7] = {};
+	if (napi_get_cb_info(env, info, &argc, args, nullptr, nullptr) != napi_ok || argc < 5) {
+		napi_throw_type_error(env, nullptr,
+		                      "composite expects (baseBytes, overlayBytes, x, y, alpha?, format?, quality?)");
+		return nullptr;
+	}
+
+	std::vector<uint8_t> baseBytes;
+	std::vector<uint8_t> overlayBytes;
+	if (!ParseBytesArg(env, args[0], baseBytes, "baseBytes must be a Uint8Array or ArrayBuffer") ||
+	    !ParseBytesArg(env, args[1], overlayBytes,
+	                   "overlayBytes must be a Uint8Array or ArrayBuffer")) {
+		return nullptr;
+	}
+	double x = 0;
+	double y = 0;
+	if (!ParseNumberArg(env, args[2], x, "x must be a number") ||
+	    !ParseNumberArg(env, args[3], y, "y must be a number")) {
+		return nullptr;
+	}
+	double alpha = 100;
+	if (argc > 4 && args[4] != nullptr) {
+		if (!ParseNumberArg(env, args[4], alpha, "alpha must be a number")) return nullptr;
+	}
+
+	tui::EncodeOptions opt;
+	if (!ParseEncodeArgs(env, args, argc, 5, opt)) return nullptr;
+
+	std::vector<uint8_t> out;
+	if (!tui::CompositeImage(baseBytes.data(), baseBytes.size(), overlayBytes.data(),
+	                         overlayBytes.size(), static_cast<int>(x), static_cast<int>(y),
+	                         static_cast<int>(alpha), opt, out)) {
+		napi_throw_type_error(env, nullptr, "failed to composite images");
+		return nullptr;
+	}
+	return MakeBytes(env, out);
+}
+
 napi_value Init(napi_env env, napi_value exports) {
 	const struct {
 		const char* name;
@@ -390,6 +769,10 @@ napi_value Init(napi_env env, napi_value exports) {
 	    {"getInfo", GetInfo},         {"resize", Resize},
 	    {"crop", Crop},               {"rotate", Rotate},
 	    {"convert", Convert},         {"getPalette", GetPalette},
+	    {"flip", Flip},               {"blur", Blur},
+	    {"roundCorners", RoundCorners}, {"circleClip", CircleClip},
+	    {"extendFill", ExtendFill},   {"edgeBlur", EdgeBlur},
+	    {"progressiveBlur", ProgressiveBlur}, {"composite", Composite},
 	};
 
 	for (const auto& entry : functions) {

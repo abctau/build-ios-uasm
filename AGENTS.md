@@ -73,8 +73,9 @@ tui-zip（zip 打包/解压 + gzip，vendor/zip.c 依赖 `ZIP_HAVE_SYMLINK=1`）
 - `npm run build:tui-zip:wasm:release` / `pack:tui-zip:wasm:release` — WASM 构建/分发（C++ 与 vendor C 分步编译再链接）
 - `npm run build:tui-zip:all` / `build:tui-zip:all:wasm` — 依次执行
 
-tui-image（缩放/裁剪/旋转/格式转换 + 主色提取，stb 头文件进 image_core.cc 单编译单元）：
+tui-image（缩放/裁剪/旋转/翻转/模糊/圆角/扩展填充/合成/格式转换 + 主色提取，stb 头文件进 image_core.cc 单编译单元）：
 
+- API 14 个：`getInfo / resize / crop / rotate(任意角度) / convert / getPalette / flip / blur / roundCorners / circleClip / extendFill / edgeBlur / progressiveBlur / composite`
 - `npm run build:tui-image:android:release` — Android（arm64 + x86_64）
 - `npm run build:tui-image:harmony:release` — 鸿蒙
 - `npm run build:tui-image:ios:release` — iOS xcframework（通常交给 CI）
@@ -129,6 +130,9 @@ WASM（需 emsdk，默认 `E:/emsdk`，可用环境变量 `EMSDK` 覆盖）：
 - stb 系列单头库的 `STB_IMAGE_IMPLEMENTATION` / `STB_IMAGE_RESIZE_IMPLEMENTATION` / `STB_IMAGE_WRITE_IMPLEMENTATION` 必须全部定义在同一个编译单元（src/tui-image/image_core.cc），binding 层只 include image_core.h，避免实现重复。
 - `stbi_write_jpg` 无 alpha 通道：输出 JPEG 前需把半透明像素铺白底合成（image_core.cc 的 FlattenAlphaToWhite），否则 alpha 被当颜色通道写坏。
 - resize2 的 sRGB 接口：`stbir_resize_uint8_srgb(in, w, h, stride, out, tw, th, stride, STBIR_RGBA)`，out 传 nullptr 自动分配；测试静态图若是 Adam7 隔行 PNG，自写的参考解码器必须处理 interlace，否则像素级比对会误报（stb 自动处理，以 stb 为准）。
+- embind 的 number 参数传了数组等错类型时会被转成 **NaN 而不是抛错**（napi 会抛），调用方拿 NaN 参与计算就静默失效——C 层对浮点参数做 `std::isfinite` 防御（image_core.cc EdgeBlurImage 的 regions），测试脚本的参数个数/类型要与 wasm 绑定签名严格一致。
+- uni_modules 插件的 package.json 若带 UTF-8 BOM，vite dev 按需加载时报 `"?{\n..." is not valid JSON`（loadPackageData），页面首次 import 插件才触发，容易漏查；node 脚本生成/复制 JSON 后要验证无 BOM。
+- 胶水层 4 平台文件（web/app-js/mp-weixin/mp-alipay）除 `readImageBytes` 外完全同构：web 用 fetch，其余三端用 downloadFile+getFileSystemManager().readFile（参考 tui-color-thief app-js 实现）；批量同步时只替换 `export async function getInfo` 之后的公共段，头部 readImageBytes 各自保留。
 
 ### C++（src/）
 
