@@ -236,6 +236,9 @@ WASM（需 emsdk，默认 `E:/emsdk`，可用环境变量 `EMSDK` 覆盖）：- 
 
 ### 其他协作约定
 
+- **iOS uasm 运行时不导出 `napi_create_async_work`**（官方文档"暂不支持 worker/thread-safe 等异步 API"，已与 DCloud 确认后期会补）：tui-ffmpeg 的 runJob 用了 Promise+async work，引用该符号导致 iOS `dlopen` 解析未定义符号失败——**整个插件所有 API 全灭**（不只是异步函数）。**决策（用户）：tui-ffmpeg iOS 支持暂停，binding.cc 保留 async work 原实现不做条件编译，等官方补齐 API 后直接重出 iOS 产物即可**（build-ios.sh + binding.gyp 的 ld 吸收方案已就绪，勿删）；Android/Harmony/Web 不受影响。其他插件 binding 切勿引用 async work 系符号，除非接受 iOS 全灭。若未来需要 iOS 真异步，可选 C++ 分片 session（runJobPrepare/Step/Cancel + JS 时间片驱动）。
+- iOS xcframework 的 **simulator slot 不能复用 device arm64 静态库**：Xcode 26 ld 校验 object 内嵌平台元数据（`LC_BUILD_VERSION` platform 字段），device arm64 .o 链 simulator 直接报 "built for 'iOS'"——ffmpeg 按平台产出 `libUasmFfmpegLibs-iphoneos.a` / `-iphonesimulator.a`（sim = arm64+x86_64 fat），binding.gyp 用 `$(PLATFORM_NAME)` build setting 链接期自动选择；gyp `<!(cmd)` 求值 cwd 是 **binding.gyp 所在目录**（非仓库根），拼接路径别重复前缀。
+- metartc/WebRTC 方向已放弃（用户决策 2026-10-03：太麻烦，DESIGN.md 归档仅作参考）。
 - tui-ffmpeg（规划中）：构建 spike 已完成——ffmpeg 7.1.1 裁剪版（LGPL，解析+抽帧，禁用编码器/网络/滤镜）三端静态库构建通过（Android arm64/x86_64 + emscripten 单线程，各 ~8MB），native 链接解码验证 PROBE OK。完整构建方法论与坑见 `E:\ffmpeg-spike\BUILD-NOTES.md`（msys 路径转换/SHELL/CC_IDENT GBK/CCDEP awk 管道等）；ffmpeg 源码与构建脚本在 `E:\ffmpeg-spike\`（不进本仓库，集成时只进产物）。
 
 - 不要手动编辑 `uni_modules/tui-color-thief-uasm/uasm/` 下的二进制与生成 JS/WASM 产物；一律通过构建命令重新生成。
