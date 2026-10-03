@@ -46,6 +46,10 @@
 │   ├── transcode_core.h/.cc     # B 方案转码引擎（runJob JSON 语义 / 统一 demux 分发 / 逻辑位置写 VecWriter）
 │   ├── binding.gyp              # target 名 UasmTuiFfmpegUasm；.a 走 ldflags 原样传（libraries 会被加 -l 前缀）
 │   └── vendor/ffmpeg/           # include/（官方子目录布局！平铺会让 libavutil/time.h 劫持系统头）+ lib/{arm64-v8a,x86_64,ohos-arm64,ohos-x86_64,wasm}/*.a
+├── src/tui-yoga/                # ★ tui-yoga 插件 C++ 源码（yoga 3.x Flex 布局引擎：树常驻 C 侧 + 增量 API + 批量布局）
+│   ├── binding.cc / wasm_binding.cc / yoga_core.h/.cc（JSON 子集 parser + 样式 op 表 + 文本预测量）
+│   ├── binding.gyp              # target 名 UasmTuiYogaUasm（21 个 cpp：core + vendor 19 个 yoga）
+│   └── vendor/yoga/             # yoga 3.2.1 源码（19 个 cpp；无 SizingMode/Assert/NodeToString/Enums.cpp）
 ├── scripts/
 │   ├── build-wasm-tui-color-thief.js   # 不依赖 make 的 WASM 构建脚本（需 EMSDK）
 │   └── pack-wasm-tui-color-thief.js    # 将 WASM 产物分发打包到 uni_modules
@@ -66,6 +70,8 @@
 │       └── mp-weixin/ mp-alipay/  # tui-color-thief.js + brotli 压缩的 .wasm.br
 ├── uni_modules/tui-zip-uasm/    # ★ tui-zip 插件（结构与 color-thief 相同：package.json/utssdk 四平台/uasm 产物）
 │   └── uasm/index.d.ts          # TuiZipUasm：zipCreate/zipList/zipReadEntry/zipExtractAll/gzipCompress/gzipDecompress
+├── uni_modules/tui-yoga-uasm/   # ★ tui-yoga 插件（同构结构；四端胶水完全一致——纯逻辑无 IO）
+│   └── uasm/index.d.ts          # TuiYogaUasm：createNode/insertChild/insertChildAt/registerStyle/applyStyle/setStyle/setStyleNum/setMeasuredSize/calculateLayout/collectFrames/getFrame/isDirty/freeNode/freeTree/removeChild
 ├── web/release/                 # WASM 构建中间产物
 ├── static/                      # 静态资源（logo 等测试图片）
 ├── Makefile                     # emscripten 官方构建流程备选（emmake make）
@@ -135,6 +141,18 @@ tui-xlsx（多 sheet Excel 读写，手写 OOXML 无外部 xlsx 库）：
 - `npm run build:tui-xlsx:wasm:release` / `pack:tui-xlsx:wasm:release` — WASM 构建/分发
 - `npm run build:tui-xlsx:all` / `build:tui-xlsx:all:wasm` — 依次执行
 - 实现要点：手写 JSON 子集 parser（xlsx_json.h）+ XML tokenizer（xlsx_xml.h），均无异常；xlsx_zip 复制 tui-zip zip_core 后加 `zip_entry_size` 读前防御（kuba zip 的 zip_entry_read 会按声称的未压缩大小 malloc，事后检查太晚）；插件不做文件 IO，保存/加载由调用方用 uni API 完成
+
+tui-yoga（yoga 3.x Flex 布局引擎，树常驻 C 侧 + 增量 API）：
+
+- API 14 个：`createNode / freeNode / freeTree / insertChild(parent, child, index?=-1) / insertChildAt / removeChild / registerStyle(propsJson)→styleId / applyStyle(nodeId, styleId) / setStyle(key, "12px"|"50%"|"auto"|枚举) / setStyleNum / setMeasuredSize（文本预测量）/ calculateLayout(root, w, h, dir?=0) / collectFrames → 扁平 [id,x,y,w,h,...] 前序含根 / getFrame / isDirty`；YGConfigSetUseWebDefaults(true)
+- 四端胶水完全同构（纯逻辑无 IO，只有 loadUasm）；样式双通道：registerStyle 整包（编译期样式表）+ setStyle/setStyleNum 微更新（运行期动态属性）
+- `npm run build:tui-yoga:android:release` — Android（arm64 + x86_64）
+- `npm run build:tui-yoga:harmony:release` — 鸿蒙
+- `npm run build:tui-yoga:ios:release` — iOS xcframework（通常交给 CI；已加入 build-ios.yml 矩阵）
+- `npm run build:tui-yoga:pack:uni-module:release` — module-pack 打包
+- `npm run build:tui-yoga:wasm:release` / `pack:tui-yoga:wasm:release` — WASM 构建/分发（wasm 仅 161KB，小程序 brotli 后 48KB）
+- `npm run build:tui-yoga:all` / `build:tui-yoga:all:wasm` — 依次执行
+- 实现要点与坑：① op 编码必须用**显式数值基址**（margin=0+edge / padding=10+edge / border=20+edge / position=30..33 / flex=40+ / display 等=60+）——曾用 PropOp 枚举基址+edge 直接加，kMargin→kPadding 枚举间隔是 7 不是 10，paddingTop 的 op 落进 margin 区间算出非法 YGEdge，**padding 全静默失效**（margin/position 正常，极具迷惑性）；② embind **不给缺省参数**——InsertChild(parentId, childId, int32 index) 二参调用时 index 取 0 变头部插入导致**插入顺序颠倒**，必须导出末尾插入版 `insertChild` + 带序版 `insertChildAt` 两个导出；③ ApplyDimEntry 曾把值型 op 转发给纯枚举版 ApplyEntry 静默丢弃（根节点 100x100 是 available 空间假象）；④ yoga 百分比相对**父内容区**（父尺寸减 padding，符合 CSS 语义）且默认 PointScaleFactor=1.0 像素取整（47.5→48），测试断言需按此预期；⑤ 文本预测量：C 侧 measure 回调返回 setMeasuredSize 存储的尺寸并自动 markDirty；⑥ Node 测试 `unpackage/test-tui-yoga.mjs`（18 断言 ALL PASS）+ `unpackage/debug-yoga.mjs`，wasm 需 http server + locateFile
 
 tui-ffmpeg（媒体解析+抽帧+B方案转码，链接预编译 ffmpeg 7.1.1 裁剪版静态库，LGPL）：
 

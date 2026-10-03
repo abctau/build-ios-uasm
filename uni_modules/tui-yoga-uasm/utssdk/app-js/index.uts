@@ -1,0 +1,109 @@
+/**
+ * tui-yoga 布局引擎（UASM）。树常驻 C 侧，增量操作 + 批量布局结果。
+ * 四端实现完全同构：纯逻辑无 IO，只需 loadUasm 加载模块。
+ */
+
+let lib : any = null
+
+async function getLib() : Promise<any> {
+	if (lib == null) {
+		lib = await uni.loadUasm('uni_modules/tui-yoga-uasm')
+	}
+	return lib as any
+}
+
+/** 创建布局节点，返回节点 id */
+export async function createNode() : Promise<number> {
+	const m = await getLib()
+	return m.createNode() as number
+}
+
+/** 释放单个节点（自动与父节点断开） */
+export async function freeNode(nodeId : number) : Promise<boolean> {
+	const m = await getLib()
+	return m.freeNode(nodeId) as boolean
+}
+
+/** 递归释放整棵子树（含自身） */
+export async function freeTree(rootId : number) : Promise<boolean> {
+	const m = await getLib()
+	return m.freeTree(rootId) as boolean
+}
+
+/** 挂载子节点；index 省略时追加到末尾 */
+export async function insertChild(parentId : number, childId : number, index ? : number) : Promise<boolean> {
+	const m = await getLib()
+	if (index == null) {
+		return m.insertChild(parentId, childId) as boolean
+	}
+	return m.insertChildAt(parentId, childId, index) as boolean
+}
+
+/** 从父节点移除子节点（不释放） */
+export async function removeChild(parentId : number, childId : number) : Promise<boolean> {
+	const m = await getLib()
+	return m.removeChild(parentId, childId) as boolean
+}
+
+/**
+ * 注册样式表（编译期用）：JSON → styleId。
+ * 注册一次可应用到任意多个节点。
+ */
+export async function registerStyle(propsJson : string) : Promise<number> {
+	const m = await getLib()
+	return m.registerStyle(propsJson) as number
+}
+
+/** 把注册的样式整包应用到节点 */
+export async function applyStyle(nodeId : number, styleId : number) : Promise<boolean> {
+	const m = await getLib()
+	return m.applyStyle(nodeId, styleId) as boolean
+}
+
+/** 单属性微更新：value 为 "12px" / "50%" / "auto" / 枚举字符串 */
+export async function setStyle(nodeId : number, key : string, value : string) : Promise<boolean> {
+	const m = await getLib()
+	return m.setStyle(nodeId, key, value) as boolean
+}
+
+/** 单属性微更新（点值快捷方式） */
+export async function setStyleNum(nodeId : number, key : string, value : number) : Promise<boolean> {
+	const m = await getLib()
+	return m.setStyleNum(nodeId, key, value) as boolean
+}
+
+/** 文本预测量：叶子节点（如文本）尺寸由调用方测量后传入 */
+export async function setMeasuredSize(nodeId : number, width : number, height : number) : Promise<boolean> {
+	const m = await getLib()
+	return m.setMeasuredSize(nodeId, width, height) as boolean
+}
+
+/**
+ * 以 rootId 为根计算布局（一次跨桥）。
+ * availWidth/availHeight 为根节点可用空间。
+ */
+export async function calculateLayout(rootId : number, availWidth : number, availHeight : number) : Promise<boolean> {
+	const m = await getLib()
+	return m.calculateLayout(rootId, availWidth, availHeight, 0) as boolean
+}
+
+/**
+ * 收集整棵树的布局结果（一次跨桥）。
+ * 返回扁平数组 [nodeId, x, y, width, height, ...]（前序遍历，含根节点）。
+ */
+export async function collectFrames(rootId : number) : Promise<number[]> {
+	const m = await getLib()
+	return m.collectFrames(rootId) as number[]
+}
+
+/** 读取单节点布局结果 [nodeId, x, y, width, height] */
+export async function getFrame(nodeId : number) : Promise<number[]> {
+	const m = await getLib()
+	return m.getFrame(nodeId) as number[]
+}
+
+/** 节点或其子树是否有待重新布局的脏标记 */
+export async function isDirty(nodeId : number) : Promise<boolean> {
+	const m = await getLib()
+	return m.isDirty(nodeId) as boolean
+}

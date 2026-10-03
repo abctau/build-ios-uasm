@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       plugins:
-        description: 'Plugin script names to build, comma-separated (empty = ALL). Valid: tui-color-thief, tui-zip, tui-image, tui-svg, tui-pdf, tui-xlsx, tui-ffmpeg'
+        description: 'Plugin script names to build, comma-separated (empty = ALL). Valid: tui-color-thief, tui-zip, tui-image, tui-svg, tui-pdf, tui-xlsx, tui-yoga, tui-ffmpeg'
         required: false
         default: ''
 
@@ -21,6 +21,7 @@ env:
       {"script":"tui-svg","module":"tui-svg-uasm","artifact":"UasmTuiSvgUasm-ios"},
       {"script":"tui-pdf","module":"tui-pdf-uasm","artifact":"UasmTuiPdfUasm-ios"},
       {"script":"tui-xlsx","module":"tui-xlsx-uasm","artifact":"UasmTuiXlsxUasm-ios"},
+      {"script":"tui-yoga","module":"tui-yoga-uasm","artifact":"UasmTuiYogaUasm-ios"},
       {"script":"tui-ffmpeg","module":"tui-ffmpeg-uasm","artifact":"UasmTuiFfmpegUasm-ios"}
     ]
 

@@ -1,0 +1,32 @@
+/**
+ * tui-yoga-uasm 对外接口定义
+ *
+ * 布局引擎（yoga 3.x）：声明式树常驻 C 侧，增量 API + 批量布局结果。
+ * 支持平台：App-Android / App-iOS / App-Harmony / Web / 微信小程序 / 支付宝小程序。
+ */
+
+/** 单节点布局结果 */
+export interface YogaFrame {
+	x : number
+	y : number
+	width : number
+	height : number
+}
+
+/**
+ * 样式属性 JSON（registerStyle 入参），值支持：
+ * - 点值：number 或 "12px"
+ * - 百分比："50%"（相对父内容区）
+ * - auto："auto"
+ * - 枚举："flex-start" / "center" / "stretch" / "row" / "column" 等
+ * - null：重置为 undefined
+ * 属性键：display/position/direction/flexDirection/justifyContent/alignItems/alignSelf/
+ * alignContent/flexWrap/overflow/flex/flexGrow/flexShrink/flexBasis/aspectRatio/
+ * width/height/minWidth/minHeight/maxWidth/maxHeight/left/top/right/bottom/
+ * margin 与 padding 与 border 系（Top/Right/Bottom/Left/H/V/All）、gapRow/gapColumn
+ */
+export type YogaStyleJson = string
+
+export type CreateNode = () => Promise<number>
+export type RegisterStyle = (propsJson : string) => Promise<number>
+export type CalculateLayout = (rootId : number, availWidth : number, availHeight : number) => Promise<YogaFrame[]>
