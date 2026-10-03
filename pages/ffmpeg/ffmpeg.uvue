@@ -155,6 +155,11 @@
 
 	// #ifndef WEB
 	async function runTranscodeTestNonWeb() {
+		errorMessage.value = ""
+		summary.value = ""
+		steps.value = []
+		running.value = true
+		try {
 			// 1. videoCrop 裁剪画面（重编码）
 			const p1 = outPath('crop')
 			await videoCrop('/static/test-video.mp4', 0, 0, 640, 480, p1)

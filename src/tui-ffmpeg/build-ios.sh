@@ -59,13 +59,10 @@ build_one() {
   echo "BUILD OK: $BUILD"
 }
 
-# 1. iphoneos arm64 (device)
+# 1. iphoneos arm64 (device) - also used for simulator arm64 slice (binary-compatible)
 build_one iphoneos "-miphoneos-version-min=$DEPLOY" arm64 "" "$FF_SRC/build-ios-iphoneos"
 
-# 2. iphonesimulator arm64
-build_one iphonesimulator "-mios-simulator-version-min=$DEPLOY" arm64 "" "$FF_SRC/build-ios-sim-arm64"
-
-# 3. iphonesimulator x86_64
+# 2. iphonesimulator x86_64
 build_one iphonesimulator "-mios-simulator-version-min=$DEPLOY" x86_64 "--disable-x86asm" "$FF_SRC/build-ios-sim-x64"
 
 LIBS="libavfilter.a libswresample.a libavformat.a libavcodec.a libswscale.a libavutil.a"
@@ -76,22 +73,30 @@ lib_path() {
   echo "$BUILD/${L%.a}/$L"
 }
 
-# 4. device libs (arm64)
-mkdir -p "$OUT_BASE/iphoneos"
-for L in $LIBS; do
-  cp "$(lib_path "$FF_SRC/build-ios-iphoneos" "$L")" "$OUT_BASE/iphoneos/$L"
-done
-# simulator fat (arm64 + x86_64 via lipo)
-mkdir -p "$OUT_BASE/iphonesimulator"
-for L in $LIBS; do
-  lipo -create "$(lib_path "$FF_SRC/build-ios-sim-arm64" "$L")" "$(lib_path "$FF_SRC/build-ios-sim-x64" "$L")" \
-    -output "$OUT_BASE/iphonesimulator/$L"
-done
+# 4. merge the 6 libs per arch (ld pulls only used members at dylib link time).
+#    Single-pass order matters: avfilter -> swresample -> avformat -> avcodec -> swscale -> avutil
+merge_arch() {
+  local BUILD=$1 OUT=$2
+  xcrun libtool -static -o "$OUT" $(for L in $LIBS; do echo "$(lib_path "$BUILD" "$L")"; done)
+}
 
-# 5. single merged lib for final app link: libUasmFfmpegLibs.a per slot
-mkdir -p "$OUT_BASE/iphoneos" "$OUT_BASE/iphonesimulator"
-xcrun libtool -static -o "$OUT_BASE/iphoneos/libUasmFfmpegLibs.a" $(for L in $LIBS; do echo "$OUT_BASE/iphoneos/$L"; done)
-xcrun libtool -static -o "$OUT_BASE/iphonesimulator/libUasmFfmpegLibs.a" $(for L in $LIBS; do echo "$OUT_BASE/iphonesimulator/$L"; done)
+# 5. single fat static lib (arm64 device + x86_64 simulator) shared by both
+#    xcframework slots: dyld/ld picks the matching slice automatically.
+#    (simulator arm64 is binary-compatible with device arm64, no separate slice needed)
+mkdir -p "$OUT_BASE"
+merge_arch "$FF_SRC/build-ios-iphoneos" "$OUT_BASE/ffmpeg-arm64.a"
+merge_arch "$FF_SRC/build-ios-sim-x64" "$OUT_BASE/ffmpeg-x86_64.a"
+lipo -create "$OUT_BASE/ffmpeg-arm64.a" "$OUT_BASE/ffmpeg-x86_64.a" \
+  -output "$OUT_BASE/libUasmFfmpegLibs.a"
+rm -f "$OUT_BASE/ffmpeg-arm64.a" "$OUT_BASE/ffmpeg-x86_64.a"
 
-ls -l "$OUT_BASE/iphoneos" "$OUT_BASE/iphonesimulator"
+ls -lh "$OUT_BASE"
+# sanity: key symbols must be present (dlopen flat namespace at runtime)
+for SYM in _sws_freeContext _sws_scale _avformat_alloc_output_context2 _avcodec_find_encoder; do
+  if ! xcrun nm -gU "$OUT_BASE/libUasmFfmpegLibs.a" | grep -q "$SYM"; then
+    echo "MISSING SYMBOL: $SYM"
+    exit 1
+  fi
+done
+echo "symbols OK"
 echo "ALL OK: $OUT_BASE"

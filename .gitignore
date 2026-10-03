@@ -6,3 +6,4 @@ web/
 *.log
 .DS_Store
 ffmpeg-spike-src/
+src/tui-ffmpeg/vendor/ffmpeg/lib/ios/

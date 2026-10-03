@@ -79,6 +79,8 @@
           },
           'ldflags': [
             '-Wl,-undefined,dynamic_lookup',
+            '-Wl,-dead_strip',
+            '<!(node -p process.cwd())/src/tui-ffmpeg/vendor/ffmpeg/lib/ios/libUasmFfmpegLibs.a',
           ],
         }],
         ['OS == "harmony"', {

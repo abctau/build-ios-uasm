@@ -1,96 +1,89 @@
 {
-	"name": "uasm-test",
-	"appid": "__UNI__7B32924",
-	"description": "",
-	"versionName": "1.0.0",
-	"versionCode": "100",
-	"uni-app-x": {
-		"styleIsolationVersion": "2",
-		"vapor": true
-	},
-	/* 快应用特有相关 */
-	"quickapp": {},
-	/* 小程序特有相关 */
-	"mp-weixin": {
-		"appid": "wx8fd668074f5e1da8",
-		"setting": {
-			"urlCheck": false
-		},
-		"usingComponents": true
-	},
-	"mp-alipay": {
-		"usingComponents": true
-	},
-	"mp-baidu": {
-		"usingComponents": true
-	},
-	"mp-toutiao": {
-		"usingComponents": true
-	},
-	"uniStatistics": {
-		"enable": false
-	},
-	"vueVersion": "3",
-	"app": {
-		"distribute": {
-			"icons": {
-				"android": {
-					"hdpi": "",
-					"xhdpi": "",
-					"xxhdpi": "",
-					"xxxhdpi": ""
-				}
-			},
-			"modules": {
-				"uni-ad": {}
-			}
-		}
-	},
-	"app-android": {
-		"distribute": {
-			"modules": {},
-			"icons": {
-				"hdpi": "",
-				"xhdpi": "",
-				"xxhdpi": "",
-				"xxxhdpi": ""
-			},
-			"splashScreens": {
-				"default": {}
-			},
-			"abiFilters": [
-				"arm64-v8a",
-				"x86_64"
-			]
-		}
-	},
-	"app-ios": {
-		"distribute": {
-			"modules": {},
-			"icons": {},
-			"splashScreens": {}
-		}
-	},
-	"app-harmony": {
-		"distribute": {
-			"deviceTypes": [
-				"phone"
-			],
-			"deviceArchs": [
-				"arm64-v8a"
-			],
-			"bundleName": "xyz.yundie.tui",
-			"signingConfigs": {
-				"default": {
-					"certpath": "c:\\Users\\Administrator\\AppData\\Roaming\\HBuilder X\\extensions\\launcher\\agc-certs\\1780997388548.cer",
-					"keyAlias": "debugKey",
-					"keyPassword": "0000001B2F4BE1A88EA89AF62562B5D0C10C9B8427D76D5EC91A65923F70D9E412B47DD5C9F2537C53E7C2",
-					"profile": "c:\\Users\\Administrator\\AppData\\Roaming\\HBuilder X\\extensions\\launcher\\agc-certs\\1780997388548.p7b",
-					"signAlg": "SHA256withECDSA",
-					"storeFile": "c:\\Users\\Administrator\\AppData\\Roaming\\HBuilder X\\extensions\\launcher\\agc-certs\\1780997388548.p12",
-					"storePassword": "0000001B2F4BE1A88EA89AF62562B5D0C10C9B8427D76D5EC91A65923F70D9E412B47DD5C9F2537C53E7C2"
-				}
-			}
-		}
-	}
+    "name" : "uasm-test",
+    "appid" : "__UNI__7B32924",
+    "description" : "",
+    "versionName" : "1.0.0",
+    "versionCode" : "100",
+    "uni-app-x" : {
+        "styleIsolationVersion" : "2",
+        "vapor" : true
+    },
+    /* 快应用特有相关 */
+    "quickapp" : {},
+    /* 小程序特有相关 */
+    "mp-weixin" : {
+        "appid" : null,
+        "setting" : {
+            "urlCheck" : false
+        },
+        "usingComponents" : true
+    },
+    "mp-alipay" : {
+        "usingComponents" : true
+    },
+    "mp-baidu" : {
+        "usingComponents" : true
+    },
+    "mp-toutiao" : {
+        "usingComponents" : true
+    },
+    "uniStatistics" : {
+        "enable" : false
+    },
+    "vueVersion" : "3",
+    "app" : {
+        "distribute" : {
+            "icons" : {
+                "android" : {
+                    "hdpi" : "",
+                    "xhdpi" : "",
+                    "xxhdpi" : "",
+                    "xxxhdpi" : ""
+                }
+            },
+            "modules" : {
+                "uni-ad" : {}
+            }
+        }
+    },
+    "app-android" : {
+        "distribute" : {
+            "modules" : {},
+            "icons" : {
+                "hdpi" : "",
+                "xhdpi" : "",
+                "xxhdpi" : "",
+                "xxxhdpi" : ""
+            },
+            "splashScreens" : {
+                "default" : {}
+            },
+            "abiFilters" : [ "arm64-v8a", "x86_64" ]
+        }
+    },
+    "app-ios" : {
+        "distribute" : {
+            "modules" : {},
+            "icons" : {},
+            "splashScreens" : {}
+        }
+    },
+    "app-harmony" : {
+        "distribute" : {
+            "deviceTypes" : [ "phone" ],
+            "deviceArchs" : [ "arm64-v8a" ],
+            "bundleName" : "xyz.yundie.tui",
+            "signingConfigs" : {
+                "default" : {
+                    "certpath" : "c:\\Users\\Administrator\\AppData\\Roaming\\HBuilder X\\extensions\\launcher\\agc-certs\\1780997388548.cer",
+                    "keyAlias" : "debugKey",
+                    "keyPassword" : "0000001B2F4BE1A88EA89AF62562B5D0C10C9B8427D76D5EC91A65923F70D9E412B47DD5C9F2537C53E7C2",
+                    "profile" : "c:\\Users\\Administrator\\AppData\\Roaming\\HBuilder X\\extensions\\launcher\\agc-certs\\1780997388548.p7b",
+                    "signAlg" : "SHA256withECDSA",
+                    "storeFile" : "c:\\Users\\Administrator\\AppData\\Roaming\\HBuilder X\\extensions\\launcher\\agc-certs\\1780997388548.p12",
+                    "storePassword" : "0000001B2F4BE1A88EA89AF62562B5D0C10C9B8427D76D5EC91A65923F70D9E412B47DD5C9F2537C53E7C2"
+                }
+            }
+        }
+    }
 }

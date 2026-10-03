@@ -74,10 +74,6 @@ jobs:
       - name: Build iOS xcframework (${{ matrix.module }})
         run: npm run build:${{ matrix.script }}:ios:release
 
-      - name: Merge ffmpeg libs into xcframework
-        if: matrix.script == 'tui-ffmpeg'
-        run: node scripts/merge-ios-ffmpeg.js
-
       - name: Pack uni_modules
         run: npm run build:${{ matrix.script }}:pack:uni-module:release
 
