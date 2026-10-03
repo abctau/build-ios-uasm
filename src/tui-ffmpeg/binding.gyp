@@ -80,7 +80,7 @@
           'ldflags': [
             '-Wl,-undefined,dynamic_lookup',
             '-Wl,-dead_strip',
-            '<!(node -p "process.cwd()")/vendor/ffmpeg/lib/ios/libUasmFfmpegLibs.a',
+            '<!(node -p "process.cwd()")/vendor/ffmpeg/lib/ios/libUasmFfmpegLibs-$(PLATFORM_NAME).a',
           ],
         }],
         ['OS == "harmony"', {

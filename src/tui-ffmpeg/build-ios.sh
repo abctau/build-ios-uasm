@@ -59,10 +59,13 @@ build_one() {
   echo "BUILD OK: $BUILD"
 }
 
-# 1. iphoneos arm64 (device) - also used for simulator arm64 slice (binary-compatible)
+# 1. iphoneos arm64 (device)
 build_one iphoneos "-miphoneos-version-min=$DEPLOY" arm64 "" "$FF_SRC/build-ios-iphoneos"
 
-# 2. iphonesimulator x86_64
+# 2. iphonesimulator arm64 (Xcode 26 ld enforces platform metadata, needs its own build)
+build_one iphonesimulator "-mios-simulator-version-min=$DEPLOY" arm64 "" "$FF_SRC/build-ios-sim-arm64"
+
+# 3. iphonesimulator x86_64
 build_one iphonesimulator "-mios-simulator-version-min=$DEPLOY" x86_64 "--disable-x86asm" "$FF_SRC/build-ios-sim-x64"
 
 LIBS="libavfilter.a libswresample.a libavformat.a libavcodec.a libswscale.a libavutil.a"
@@ -73,30 +76,37 @@ lib_path() {
   echo "$BUILD/${L%.a}/$L"
 }
 
-# 4. merge the 6 libs per arch (ld pulls only used members at dylib link time).
-#    Single-pass order matters: avfilter -> swresample -> avformat -> avcodec -> swscale -> avutil
+# 4. per-slot merged libs (single-pass order: avfilter->swresample->avformat->avcodec->swscale->avutil)
+#    -iphoneos.a        : device arm64
+#    -iphonesimulator.a : simulator fat (arm64 + x86_64)
+#    binding.gyp references them via libUasmFfmpegLibs-$(PLATFORM_NAME).a so each
+#    xcframework slot links the matching platform build (Xcode 26 rejects mixed metadata).
 merge_arch() {
-  local BUILD=$1 OUT=$2
-  xcrun libtool -static -o "$OUT" $(for L in $LIBS; do echo "$(lib_path "$BUILD" "$L")"; done)
+  local OUT=$1
+  shift
+  xcrun libtool -static -o "$OUT" "$@"
 }
 
-# 5. single fat static lib (arm64 device + x86_64 simulator) shared by both
-#    xcframework slots: dyld/ld picks the matching slice automatically.
-#    (simulator arm64 is binary-compatible with device arm64, no separate slice needed)
-mkdir -p "$OUT_BASE"
-merge_arch "$FF_SRC/build-ios-iphoneos" "$OUT_BASE/ffmpeg-arm64.a"
-merge_arch "$FF_SRC/build-ios-sim-x64" "$OUT_BASE/ffmpeg-x86_64.a"
-lipo -create "$OUT_BASE/ffmpeg-arm64.a" "$OUT_BASE/ffmpeg-x86_64.a" \
-  -output "$OUT_BASE/libUasmFfmpegLibs.a"
-rm -f "$OUT_BASE/ffmpeg-arm64.a" "$OUT_BASE/ffmpeg-x86_64.a"
+merge_arch "$OUT_BASE/libUasmFfmpegLibs-iphoneos.a" \
+  $(for L in $LIBS; do echo "$(lib_path "$FF_SRC/build-ios-iphoneos" "$L")"; done)
+
+merge_arch "$OUT_BASE/sim-arm64.a" \
+  $(for L in $LIBS; do echo "$(lib_path "$FF_SRC/build-ios-sim-arm64" "$L")"; done)
+merge_arch "$OUT_BASE/sim-x86_64.a" \
+  $(for L in $LIBS; do echo "$(lib_path "$FF_SRC/build-ios-sim-x64" "$L")"; done)
+lipo -create "$OUT_BASE/sim-arm64.a" "$OUT_BASE/sim-x86_64.a" \
+  -output "$OUT_BASE/libUasmFfmpegLibs-iphonesimulator.a"
+rm -f "$OUT_BASE/sim-arm64.a" "$OUT_BASE/sim-x86_64.a"
 
 ls -lh "$OUT_BASE"
 # sanity: key symbols must be present (dlopen flat namespace at runtime)
-for SYM in _sws_freeContext _sws_scale _avformat_alloc_output_context2 _avcodec_find_encoder; do
-  if ! xcrun nm -gU "$OUT_BASE/libUasmFfmpegLibs.a" | grep -q "$SYM"; then
-    echo "MISSING SYMBOL: $SYM"
-    exit 1
-  fi
+for F in "$OUT_BASE/libUasmFfmpegLibs-iphoneos.a" "$OUT_BASE/libUasmFfmpegLibs-iphonesimulator.a"; do
+  for SYM in _sws_freeContext _sws_scale _avformat_alloc_output_context2 _avcodec_find_encoder; do
+    if ! xcrun nm -gU "$F" | grep -q "$SYM"; then
+      echo "MISSING SYMBOL in $(basename "$F"): $SYM"
+      exit 1
+    fi
+  done
 done
 echo "symbols OK"
 echo "ALL OK: $OUT_BASE"
