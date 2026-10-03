@@ -41,6 +41,10 @@
 │   ├── xlsx_zip.h/.cc           # 复制自 tui-zip zip_core（裁 gzip + maxUncompressed 解压炸弹防御）
 │   ├── binding.gyp              # target 名 UasmTuiXlsxUasm
 │   └── vendor/                  # miniz.h + zip.c/zip.h（kuba--/zip，MIT）
+├── src/tui-ffmpeg/              # ★ tui-ffmpeg 插件 C++ 源码（媒体解析+抽帧，链接预编译 ffmpeg 静态库）
+│   ├── binding.cc / wasm_binding.cc / ffmpeg_core.h/.cc（内存 AVIO + swscale RGBA + stb PNG）
+│   ├── binding.gyp              # target 名 UasmTuiFfmpegUasm；.a 走 ldflags 原样传（libraries 会被加 -l 前缀）
+│   └── vendor/ffmpeg/           # include/（官方子目录布局！平铺会让 libavutil/time.h 劫持系统头）+ lib/{arm64-v8a,x86_64,wasm}/*.a
 ├── scripts/
 │   ├── build-wasm-tui-color-thief.js   # 不依赖 make 的 WASM 构建脚本（需 EMSDK）
 │   └── pack-wasm-tui-color-thief.js    # 将 WASM 产物分发打包到 uni_modules
@@ -131,9 +135,18 @@ tui-xlsx（多 sheet Excel 读写，手写 OOXML 无外部 xlsx 库）：
 - `npm run build:tui-xlsx:all` / `build:tui-xlsx:all:wasm` — 依次执行
 - 实现要点：手写 JSON 子集 parser（xlsx_json.h）+ XML tokenizer（xlsx_xml.h），均无异常；xlsx_zip 复制 tui-zip zip_core 后加 `zip_entry_size` 读前防御（kuba zip 的 zip_entry_read 会按声称的未压缩大小 malloc，事后检查太晚）；插件不做文件 IO，保存/加载由调用方用 uni API 完成
 
-WASM（需 emsdk，默认 `E:/emsdk`，可用环境变量 `EMSDK` 覆盖）：
+tui-ffmpeg（媒体解析+抽帧，链接预编译 ffmpeg 7.1.1 裁剪版静态库，LGPL）：
 
-- `npm run build:tui-color-thief:wasm:release` — 编译 `src/tui-color-thief/` → `web/release/`
+- API 2 个：`getMediaInfo(path)` → 容器/时长/流信息（h264/hevc/vp9/aac 等常见解码器）、`extractFrame(path, timeMs, maxWidth)` → PNG bytes（AVIO 内存流 + av_seek_frame BACKWARD + swscale RGBA + stb PNG）；无编码器/网络/滤镜，单条目无解压炸弹面
+- `npm run build:tui-ffmpeg:android:release` — Android（arm64 + x86_64）
+- `npm run build:tui-ffmpeg:harmony:release` — 鸿蒙（链接 vendor/ffmpeg/lib/ohos-arm64、ohos-x86_64 静态库；ffmpeg ohos 构建脚本 E:\ffmpeg-spike\build-harmony.sh）
+- `npm run build:tui-ffmpeg:ios:release` — iOS xcframework（需先出 ios .a，通常交给 CI）
+- `npm run build:tui-ffmpeg:pack:uni-module:release` — module-pack 打包
+- `npm run build:tui-ffmpeg:wasm:release` / `pack:tui-ffmpeg:wasm:release` — WASM 构建/分发（wasm .a 在 vendor/ffmpeg/lib/wasm，来自 build-emscripten）
+- `npm run build:tui-ffmpeg:all` / `build:tui-ffmpeg:all:wasm` — 依次执行
+- 产物：Android .so ~5.5MB/abi、WASM ~4.2MB（brotli 后更小）；ffmpeg 构建方法论（msys 路径转换/CC_IDENT GBK/emconfigure 不可用等 8 坑）见 `E:\ffmpeg-spike\BUILD-NOTES.md`
+
+WASM（需 emsdk，默认 `E:/emsdk`，可用环境变量 `EMSDK` 覆盖）：- `npm run build:tui-color-thief:wasm:release` — 编译 `src/tui-color-thief/` → `web/release/`
 - `npm run pack:tui-color-thief:wasm:release` — 分发到 `uasm/{web,mp-weixin,mp-alipay}`（小程序端自动 brotli 压缩）
 - `npm run build:tui-color-thief:all:wasm` — 构建 + 打包
 - 备选：加载 emsdk 环境后 `emmake make BUILD_TYPE=Release`（`BROTLI=1` 可产出 .br）
@@ -188,6 +201,9 @@ WASM（需 emsdk，默认 `E:/emsdk`，可用环境变量 `EMSDK` 覆盖）：
 - embind **不接受原生 Uint8Array 作为 register_vector<uint8_t> 参数**（要 Uint8Vector 包装类实例）——多字节数组参数一律用 `emscripten::val` + `vecFromJSArray<uint8_t>` 手动转换（tui-pdf 的 packed+offsets 模式）。
 - Node 测试脚本同时加载多个 uasm WASM 模块时，`locateFile` 必须给每个模块返回**不同的 URL**（否则 http server 按路由返回错文件，embind 绑定静默错位、导出残缺）。
 - 多图传递约定（napi/embind 同构）：胶水层把所有图拼成一个大 Uint8Array + 平铺 offsets `[start0,len0,start1,len1,...]`，绑定层再拆分——避免 napi 遍历对象数组与 embind 嵌套 vector 的跨端差异。
+- uni-gyp 的 `libraries` 条目会被加 `-l` 前缀——链接预编译静态库（.a）一律走 `ldflags` 原样传绝对路径（CMake 把 ldflags 输出在 objects 之后，顺序满足单遍解析）；gyp `sources` 里的 .a 会被 CMake 忽略（.so 只有几 KB 且符号全 U，被 `--unresolved-symbols=ignore-all` 掩盖，务必 nm 验证）。
+- ffmpeg 7.1 公共头**没有 extern "C" 保护**，且 `libavutil/time.h` 是真实公共头——头文件必须保持官方 `include/{libavformat,libavcodec,libswscale,libavutil}/` 子目录布局（平铺会让 `#include <time.h>` 命中 ffmpeg 的 time.h，tm/nanosleep 未声明 → libc++ locale/pthread 头全面报错），且使用方必须整体包 extern "C"。
+- ffmpeg configure 的 `--sysroot` 路径**带空格会被 configure 内部重分词拆掉**（即使 bash 引号正确）——DevEco NDK 在 `C:\Program Files\...`，用 junction `C:\ohos-ndk`（已建）绕过；ohos 交叉编要点：`--target-os=linux`（ohos 是 linux 内核）+ `--cc=clang --extra-cflags="--target=aarch64-linux-ohos -D__MUSL__" --sysroot=C:/ohos-ndk/sysroot` + llvm-ar/nm/ranlib/strip。
 
 ### C++（src/）
 
@@ -205,6 +221,8 @@ WASM（需 emsdk，默认 `E:/emsdk`，可用环境变量 `EMSDK` 覆盖）：
 - 构建脚本中的 SDK 路径为机器特定配置，改动需谨慎并确认跨环境可用（优先支持环境变量覆盖）。
 
 ### 其他协作约定
+
+- tui-ffmpeg（规划中）：构建 spike 已完成——ffmpeg 7.1.1 裁剪版（LGPL，解析+抽帧，禁用编码器/网络/滤镜）三端静态库构建通过（Android arm64/x86_64 + emscripten 单线程，各 ~8MB），native 链接解码验证 PROBE OK。完整构建方法论与坑见 `E:\ffmpeg-spike\BUILD-NOTES.md`（msys 路径转换/SHELL/CC_IDENT GBK/CCDEP awk 管道等）；ffmpeg 源码与构建脚本在 `E:\ffmpeg-spike\`（不进本仓库，集成时只进产物）。
 
 - 不要手动编辑 `uni_modules/tui-color-thief-uasm/uasm/` 下的二进制与生成 JS/WASM 产物；一律通过构建命令重新生成。
 - 提交前运行相关构建命令确认可编译；提交信息用简短英文或中文一行。

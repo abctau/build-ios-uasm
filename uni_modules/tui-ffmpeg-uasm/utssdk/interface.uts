@@ -1,0 +1,18 @@
+export interface MediaStreamInfo {
+	type : string
+	codec : string
+	durationMs : number
+	bitrate : number
+	width ?: number
+	height ?: number
+	fps ?: number
+	sampleRate ?: number
+	channels ?: number
+}
+
+export interface MediaInfo {
+	container : string
+	durationMs : number
+	bitrate : number
+	streams : MediaStreamInfo[]
+}

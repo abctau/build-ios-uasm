@@ -24,6 +24,7 @@
 		<button class="btn" @click="goSvgTest">SVG 渲染测试（tui-svg）→</button>
 		<button class="btn" @click="goPdfTest">PDF 生成测试（tui-pdf）→</button>
 		<button class="btn" @click="goXlsxTest">Excel 读写测试（tui-xlsx）→</button>
+		<button class="btn" @click="goFfmpegTest">视频解析抽帧测试（tui-ffmpeg）→</button>
 	</view>
 </template>
 
@@ -53,6 +54,10 @@
 
 	function goXlsxTest() {
 		uni.navigateTo({ url: '/pages/xlsx/xlsx' })
+	}
+
+	function goFfmpegTest() {
+		uni.navigateTo({ url: '/pages/ffmpeg/ffmpeg' })
 	}
 
 	async function testColorThief() {

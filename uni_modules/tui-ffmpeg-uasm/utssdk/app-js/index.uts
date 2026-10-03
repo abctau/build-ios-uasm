@@ -1,0 +1,78 @@
+import { type MediaInfo } from '../interface.uts'
+
+/**
+ * App/小程序端实现：网络媒体先 downloadFile，再读文件字节，交给 UASM 模块解析/抽帧。
+ */
+
+function downloadToTemp(url: string): Promise<string> {
+	return new Promise<string>((resolve, reject) => {
+		uni.downloadFile({
+			url: url,
+			success: (res) => {
+				if (res.statusCode == 200) {
+					resolve(res.tempFilePath)
+				} else {
+					reject(new Error('tui-ffmpeg: download failed ' + res.statusCode + ' for ' + url))
+				}
+			},
+			fail: (err) => {
+				reject(new Error('tui-ffmpeg: download failed: ' + err.errMsg))
+			}
+		})
+	})
+}
+
+function readLocalBytes(filePath: string): Promise<ArrayBuffer> {
+	return new Promise<ArrayBuffer>((resolve, reject) => {
+		uni.getFileSystemManager().readFile({
+			filePath: filePath,
+			success: (res) => {
+				resolve(res.data as ArrayBuffer)
+			},
+			fail: (err) => {
+				reject(new Error('tui-ffmpeg: read failed: ' + err.errMsg))
+			}
+		})
+	})
+}
+
+async function readBytes(path: string): Promise<Uint8Array> {
+	if (path.startsWith('http://') || path.startsWith('https://')) {
+		const tmp = await downloadToTemp(path)
+		return new Uint8Array(await readLocalBytes(tmp))
+	}
+	return new Uint8Array(await readLocalBytes(path))
+}
+
+export async function getMediaInfo(path : string) : Promise<MediaInfo> {
+	if (path.length == 0) {
+		throw new Error('tui-ffmpeg: path is empty')
+	}
+	const bytes = await readBytes(path)
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-ffmpeg-uasm')
+		const json = lib.getMediaInfo(bytes) as string
+		return JSON.parse(json) as MediaInfo
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-ffmpeg: getMediaInfo failed')
+	}
+}
+
+/**
+ * 抽取 timeMs 附近（向后取关键帧）的视频帧，编码为 PNG。
+ * maxWidth > 0 时等比缩放到该宽度；<= 0 保持原始尺寸。
+ */
+export async function extractFrame(path : string, timeMs : number, maxWidth : number) : Promise<Uint8Array> {
+	if (path.length == 0) {
+		throw new Error('tui-ffmpeg: path is empty')
+	}
+	const bytes = await readBytes(path)
+	try {
+		const lib = await uni.loadUasm('uni_modules/tui-ffmpeg-uasm')
+		return lib.extractFrame(bytes, timeMs, maxWidth) as Uint8Array
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-ffmpeg: extractFrame failed')
+	}
+}

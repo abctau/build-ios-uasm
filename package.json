@@ -53,7 +53,15 @@
 "build:tui-xlsx:wasm:release": "node scripts/build-wasm-tui-xlsx.js",
 "pack:tui-xlsx:wasm:release": "node scripts/pack-wasm-tui-xlsx.js",
 "build:tui-xlsx:all": "npm run build:tui-xlsx:android:release && npm run build:tui-xlsx:harmony:release && npm run build:tui-xlsx:ios:release && npm run build:tui-xlsx:pack:uni-module:release",
-"build:tui-xlsx:all:wasm": "npm run build:tui-xlsx:wasm:release && npm run pack:tui-xlsx:wasm:release"
+    "build:tui-xlsx:all:wasm": "npm run build:tui-xlsx:wasm:release && npm run pack:tui-xlsx:wasm:release",
+    "build:tui-ffmpeg:android:release": "uni-gyp --platform=android --depth=. --sdk-path=\"E:/hbAndroidSdk\" --ndk-path=\"E:/hbAndroidSdk/ndk/29.0.14206865\" --arch=arm64 --build Release src/tui-ffmpeg/binding.gyp && uni-gyp --platform=android --depth=. --sdk-path=\"E:/hbAndroidSdk\" --ndk-path=\"E:/hbAndroidSdk/ndk/29.0.14206865\" --arch=x64 --build Release src/tui-ffmpeg/binding.gyp",
+"build:tui-ffmpeg:harmony:release": "set \"PATH=E:\\hbAndroidSdk\\cmake\\3.22.1\\bin;%PATH%\" && uni-gyp --platform=harmony --depth=. --ndk-path=\"C:/Program Files/Huawei/DevEco Studio/sdk/default/openharmony/native\" --arch=arm64 --build Release src/tui-ffmpeg/binding.gyp && uni-gyp --platform=harmony --depth=. --ndk-path=\"C:/Program Files/Huawei/DevEco Studio/sdk/default/openharmony/native\" --arch=x64 --build Release src/tui-ffmpeg/binding.gyp",
+"build:tui-ffmpeg:ios:release": "uni-gyp --platform=ios --depth=. --sdk=all --arch=arm64,x64 --deployment-target=15.0 --build Release src/tui-ffmpeg/binding.gyp",
+"build:tui-ffmpeg:pack:uni-module:release": "uni-gyp module-pack --target tui-ffmpeg-uasm",
+"build:tui-ffmpeg:wasm:release": "node scripts/build-wasm-tui-ffmpeg.js",
+"pack:tui-ffmpeg:wasm:release": "node scripts/pack-wasm-tui-ffmpeg.js",
+"build:tui-ffmpeg:all": "npm run build:tui-ffmpeg:android:release && npm run build:tui-ffmpeg:harmony:release && npm run build:tui-ffmpeg:ios:release && npm run build:tui-ffmpeg:pack:uni-module:release",
+"build:tui-ffmpeg:all:wasm": "npm run build:tui-ffmpeg:wasm:release && npm run pack:tui-ffmpeg:wasm:release"
   },
   "dependencies": {
     "@dcloudio/uni-gyp": "^1.0.1",

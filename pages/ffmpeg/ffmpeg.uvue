@@ -1,0 +1,191 @@
+<template>
+	<view class="page">
+		<text class="title">tui-ffmpeg-uasm 媒体解析/抽帧测试</text>
+		<text class="text">getMediaInfo 解析 + extractFrame 抽帧（PNG 预览），逐项校验。</text>
+
+		<button class="btn" :disabled="running" @click="runTest">运行测试</button>
+
+		<view class="step" v-for="(item, i) in steps" :key="i">
+			<text class="step-name">{{ item.name }}</text>
+			<text :class="item.ok ? 'step-ok' : 'step-pending'">{{ item.detail }}</text>
+		</view>
+
+		<image class="frame" v-if="frame1.length > 0" :src="frame1Src" mode="aspectFit" />
+		<image class="frame" v-if="frame2.length > 0" :src="frame2Src" mode="aspectFit" />
+
+		<text class="summary" v-if="summary.length > 0">{{ summary }}</text>
+		<text class="error" v-if="errorMessage.length > 0">{{ errorMessage }}</text>
+	</view>
+</template>
+
+<script setup lang="uts">
+	import { getMediaInfo, extractFrame } from '@/uni_modules/tui-ffmpeg-uasm'
+
+	type Step = {
+		name : string,
+		ok : boolean,
+		detail : string
+	}
+
+	const steps = ref<Step[]>([])
+	const summary = ref("")
+	const errorMessage = ref("")
+	const running = ref(false)
+	const frame1 = ref<Uint8Array>(new Uint8Array(0))
+	const frame2 = ref<Uint8Array>(new Uint8Array(0))
+	const frame1Src = ref("")
+	const frame2Src = ref("")
+
+	function addStep(name : string, ok : boolean, detail : string) {
+		const list = steps.value
+		list.push({ name: name, ok: ok, detail: detail } as Step)
+		steps.value = list
+	}
+
+	function bytesToSrc(bytes : Uint8Array) : string {
+		// #ifdef WEB
+		const blob = new Blob([bytes as any], { type: 'image/png' })
+		return URL.createObjectURL(blob)
+		// #endif
+		// #ifndef WEB
+		const path = uni.env.USER_DATA_PATH + '/ffmpeg-frame-' + Date.now() + '.png'
+		uni.getFileSystemManager().writeFile(path, bytes as any, 'binary')
+		return path
+		// #endif
+	}
+
+	async function runTest() {
+		errorMessage.value = ""
+		summary.value = ""
+		steps.value = []
+		running.value = true
+		try {
+			// 1. 媒体信息解析
+			const info = await getMediaInfo('/static/test-video.mp4')
+			const video = info.streams.find((s) : boolean => s.type == 'video')
+			const okInfo = video != null && video.width == 1280 && video.height == 720 &&
+				info.durationMs > 9000 && info.durationMs < 12000 && info.streams.length == 2
+			addStep('getMediaInfo', okInfo,
+				'container=' + info.container + ' durationMs=' + info.durationMs + ' streams=' + info.streams.length)
+
+			// 2. 首帧抽帧（原始尺寸）
+			const png1 = await extractFrame('/static/test-video.mp4', 0, 0)
+			const magicOk = png1.length > 1000 && png1[0] == 0x89 && png1[1] == 0x50 && png1[2] == 0x4e && png1[3] == 0x47
+			addStep('extractFrame 首帧', magicOk, 'PNG ' + png1.length + ' B (1280x720)')
+			if (magicOk) {
+				frame1.value = png1
+				frame1Src.value = bytesToSrc(png1)
+			}
+
+			// 3. 中段抽帧 + 缩放 320 宽
+			const png2 = await extractFrame('/static/test-video.mp4', 5000, 320)
+			const w = (png2[16] << 24) | (png2[17] << 16) | (png2[18] << 8) | png2[19]
+			const h = (png2[20] << 24) | (png2[21] << 16) | (png2[22] << 8) | png2[23]
+			const okScale = png2.length > 500 && w == 320 && h == 180
+			addStep('extractFrame t=5s 缩放', okScale, 'PNG ' + png2.length + ' B (' + w + 'x' + h + ')')
+			if (okScale) {
+				frame2.value = png2
+				frame2Src.value = bytesToSrc(png2)
+			}
+
+			// 4. 尾段 seek 边界
+			const png3 = await extractFrame('/static/test-video.mp4', 9900, 160)
+			addStep('extractFrame t=9.9s', png3.length > 300, 'PNG ' + png3.length + ' B')
+
+			// 5. 错误拒绝：垃圾字节
+			let rejected = false
+			try {
+				await extractFrame('/static/logo.png', 0, 0)
+			} catch (e) {
+				rejected = true
+			}
+			addStep('垃圾输入拒绝', rejected, 'rejected=' + rejected)
+
+			const list = steps.value
+			let allPass = true
+			for (let i = 0; i < list.length; i++) {
+				if (!list[i].ok) {
+					allPass = false
+				}
+			}
+			if (allPass) {
+				summary.value = '✓ 全部 ' + list.length + ' 项通过'
+			} else {
+				errorMessage.value = '存在失败项，请查看控制台日志'
+			}
+		} catch (e) {
+			console.log(e)
+			errorMessage.value = '测试异常中断，请查看控制台日志'
+		}
+		running.value = false
+	}
+</script>
+
+<style>
+	.page {
+		padding: 15px;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.title {
+		font-size: 18px;
+		font-weight: bold;
+		margin-bottom: 10px;
+	}
+
+	.text {
+		font-size: 13px;
+		line-height: 20px;
+		margin-bottom: 6px;
+		color: #666666;
+	}
+
+	.btn {
+		margin-top: 12px;
+	}
+
+	.step {
+		margin-top: 12px;
+		padding: 10px;
+		border-radius: 6px;
+		background-color: #F5F6F8;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.step-name {
+		font-size: 14px;
+		font-weight: bold;
+		margin-bottom: 4px;
+	}
+
+	.step-ok {
+		font-size: 12px;
+		color: #34C759;
+	}
+
+	.step-pending {
+		font-size: 12px;
+		color: #FF3B30;
+	}
+
+	.frame {
+		margin-top: 12px;
+		width: 320px;
+		height: 180px;
+	}
+
+	.summary {
+		margin-top: 15px;
+		font-size: 14px;
+		font-weight: bold;
+		color: #34C759;
+	}
+
+	.error {
+		margin-top: 15px;
+		font-size: 13px;
+		color: #FF3B30;
+	}
+</style>

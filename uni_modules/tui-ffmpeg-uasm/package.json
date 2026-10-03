@@ -1,0 +1,104 @@
+{
+	"id": "tui-ffmpeg-uasm",
+	"displayName": "tui-ffmpeg-uasm",
+	"version": "0.0.1",
+	"description": "UASM ffmpeg 插件：媒体信息解析 + 视频抽帧（LGPL，无编码器）",
+	"keywords": [
+		"image",
+		"缩放",
+		"压缩",
+		"调色板",
+		"uasm"
+	],
+	"repository": "",
+	"engines": {
+		"HBuilderX": "^5.31",
+		"uni-app": "",
+		"uni-app-x": "^5.31"
+	},
+	"dcloudext": {
+		"type": "uasm",
+		"sale": {
+			"regular": {
+				"price": "0.00"
+			},
+			"sourcecode": {
+				"price": "0.00"
+			}
+		},
+		"contact": {
+			"qq": ""
+		},
+		"declaration": {
+			"ads": "无",
+			"data": "插件不采集任何数据",
+			"permissions": "无"
+		},
+		"npmurl": "",
+		"vapor": "y",
+		"darkmode": "x",
+		"i18n": "x",
+		"widescreen": "x"
+	},
+	"uni_modules": {
+		"dependencies": [],
+		"encrypt": [],
+		"platforms": {
+			"cloud": {
+				"tcb": "y",
+				"aliyun": "y",
+				"alipay": "y"
+			},
+			"client": {
+				"uni-app": {
+					"vue": {
+						"vue2": "-",
+						"vue3": "-"
+					},
+					"web": {
+						"safari": "-",
+						"chrome": "-"
+					},
+					"app": {
+						"vue": "-",
+						"nvue": "-",
+						"android": "-",
+						"ios": "-",
+						"harmony": "-"
+					},
+					"mp": {
+						"weixin": "-",
+						"alipay": "-",
+						"toutiao": "-",
+						"baidu": "-",
+						"kuaishou": "-",
+						"jd": "-",
+						"harmony": "-",
+						"qq": "-",
+						"lark": "-",
+						"xhs": "-"
+					},
+					"quickapp": {
+						"huawei": "-",
+						"union": "-"
+					}
+				},
+				"uni-app-x": {
+					"web": {
+						"safari": "y",
+						"chrome": "y"
+					},
+					"app": {
+						"android": "y",
+						"ios": "y",
+						"harmony": "y"
+					},
+					"mp": {
+						"weixin": "y",
+						"alipay": "y"
+					}
+				}
+			}
+		}
+	}
+}

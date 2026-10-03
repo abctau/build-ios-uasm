@@ -35,6 +35,12 @@
 			"style": {
 				"navigationBarTitleText": "tui-xlsx 测试"
 			}
+		},
+		{
+			"path": "pages/ffmpeg/ffmpeg",
+			"style": {
+				"navigationBarTitleText": "tui-ffmpeg 测试"
+			}
 		}
 	],
 	"globalStyle": {
