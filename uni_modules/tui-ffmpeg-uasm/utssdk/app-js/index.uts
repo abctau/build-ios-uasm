@@ -149,9 +149,47 @@ function effectToFilter(effect : string) : string {
 /**
  * path 模式转码：options 组 JSON（inputs 为文件路径数组，output 为目标路径），
  * native runJob 在异步线程完成 读取→转码→写文件，返回 Promise<boolean>。
+ * native fopen 只能读沙盒绝对路径：http//static 先落到 USER_DATA_PATH 临时文件。
  */
+let inputTmpSeq = 0
+
+function writeTmpFile(bytes : Uint8Array, ext : string) : string {
+	inputTmpSeq++
+	const tmp = uni.env.USER_DATA_PATH + '/ff-in-' + Date.now().toString() + '-' + inputTmpSeq.toString() + ext
+	uni.getFileSystemManager().writeFile(tmp, bytes as any, 'binary')
+	return tmp
+}
+
+async function resolveInputPath(path : string) : Promise<string> {
+	if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('/static/')) {
+		const bytes = await readBytes(path)
+		return writeTmpFile(bytes, '.bin')
+	}
+	return path
+}
+
+function resolveOutputPath(path : string) : string {
+	let p = path
+	if (p.startsWith('file://')) p = p.substring(7)
+	if (!p.startsWith('/')) p = uni.env.USER_DATA_PATH + '/' + p
+	return p
+}
+
 async function runJobToPath(options : UTSJSONObject) : Promise<boolean> {
 	const lib = await uni.loadUasm('uni_modules/tui-ffmpeg-uasm')
+	const inputs = options.getArray('inputs')
+	if (inputs != null) {
+		const resolved : string[] = []
+		for (let i = 0; i < inputs.length; i++) {
+			const p = inputs[i] as string
+			resolved.push(await resolveInputPath(p))
+		}
+		options.set('inputs', resolved)
+	}
+	const out = options.getString('output')
+	if (out != null) {
+		options.set('output', resolveOutputPath(out))
+	}
 	const json = JSON.stringify(options)
 	const res = await lib.runJob(json) as string
 	const parsed = JSON.parse(res) as UTSJSONObject

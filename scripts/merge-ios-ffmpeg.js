@@ -34,6 +34,15 @@ function mergeSlot(slotName, libPath) {
   const tmp = bin + '.merged'
   console.log('[merge-ios-ffmpeg] ' + slotName + ' <- ' + libPath)
   execFileSync('xcrun', ['libtool', '-static', '-o', tmp, bin, libPath], { stdio: 'inherit' })
+  // sanity check: ffmpeg symbols must be present after merge (dlopen flat namespace)
+  const syms = execFileSync('xcrun', ['nm', '-gU', tmp], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  const required = ['_sws_freeContext', '_sws_scale', '_avformat_alloc_output_context2', '_avcodec_find_encoder']
+  for (const s of required) {
+    if (syms.indexOf(s) < 0) {
+      console.error('[merge-ios-ffmpeg] missing symbol after merge: ' + s)
+      process.exit(1)
+    }
+  }
   fs.renameSync(tmp, bin)
 }
 

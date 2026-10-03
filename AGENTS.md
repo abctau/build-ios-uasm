@@ -199,6 +199,7 @@ WASM（需 emsdk，默认 `E:/emsdk`，可用环境变量 `EMSDK` 覆盖）：- 
 - uni_modules 插件的 package.json 若带 UTF-8 BOM，vite dev 按需加载时报 `"?{\n..." is not valid JSON`（loadPackageData），页面首次 import 插件才触发，容易漏查；node 脚本生成/复制 JSON 后要验证无 BOM。
 - 胶水层 4 平台文件（web/app-js/mp-weixin/mp-alipay）除 `readImageBytes` 外完全同构：web 用 fetch，其余三端用 downloadFile+getFileSystemManager().readFile（参考 tui-color-thief app-js 实现）；批量同步时只替换 `export async function getInfo` 之后的公共段，头部 readImageBytes 各自保留。
 - **胶水层 App/小程序端严禁直接用 fetch**（tui-pdf 实录）：iOS 的 vapor JS 运行在 JavaScriptCore，**没有 fetch 全局**，报 "Can't find variable: fetch"（Android 引擎有 polyfill 所以本机测试不易暴露）；http 走 uni.downloadFile、本地/临时路径走 readFile（参照 tui-ffmpeg app-js 的 readBytes）。
+- **native fopen 只能读沙盒绝对路径**（tui-ffmpeg path 模式实录）：`/static/`（iOS 在 Bundle、Android 在 assets）与 http 路径直接传给 native runJob 必失败——胶水层必须先把输入落到 `uni.env.USER_DATA_PATH` 临时文件再传绝对路径，输出路径去 `file://` 前缀归一化（runJobToPath 统一处理 inputs/output）。iOS dlopen 报 "symbol not found in flat namespace (_sws_xxx)" = xcframework 二进制里没合并 ffmpeg 静态库——走 build-ios.sh + merge-ios-ffmpeg.js 流程，merge 脚本已带 nm 关键符号自检。
 - nanosvg 的 `nsvgParse` **会原地修改输入字符串**（必须传可写、以 \0 结尾的副本，parse 完才能 free）；且对垃圾输入**不返回 null 而是空 image**——必须检查 `image->shapes == nullptr` 判定解析失败（svg_core.cc 的 ParseSvgCopy）。
 - nanosvgrast.h 的光栅化头文件名容易猜错：是 `nanosvgrast.h`（不是 nanosvg.raster.h），与 nanosvg.h 同在仓库 src/ 目录。
 - `nsvgRasterize` 只支持**单一等比 scale**（无 x/y 独立缩放）：renderSize 非等比时取 min(tx, ty)，内容贴左上、另一方向留透明。
