@@ -1,6 +1,5 @@
 #include "xlsx_core.h"
 
-#include <charconv>
 #include <cmath>
 #include <cstdlib>
 #include <string>
@@ -35,12 +34,12 @@ void ColToRef(std::string& out, size_t col) {
 
 void AppendNumber(std::string& out, double v) {
 	char buf[40];
-	const auto res = std::to_chars(buf, buf + sizeof(buf), v);
-	if (res.ec != std::errc()) {
+	const int n = tui::json_detail::FormatDoubleShortest(buf, sizeof(buf), v);
+	if (n <= 0) {
 		out += "0";
 		return;
 	}
-	out.append(buf, res.ptr);
+	out.append(buf, static_cast<size_t>(n));
 }
 
 std::string XmlDecl() {

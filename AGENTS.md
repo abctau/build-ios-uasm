@@ -199,6 +199,7 @@ WASM（需 emsdk，默认 `E:/emsdk`，可用环境变量 `EMSDK` 覆盖）：- 
 - `nsvgRasterize` 只支持**单一等比 scale**（无 x/y 独立缩放）：renderSize 非等比时取 min(tx, ty)，内容贴左上、另一方向留透明。
 - nanosvg 已在解析期把 viewBox/内容边界回退到 image->width/height（恒 >0），无需自己处理 viewBox 回退；不支持 `<text>` 文字渲染。
 - embind **不接受原生 Uint8Array 作为 register_vector<uint8_t> 参数**（要 Uint8Vector 包装类实例）——多字节数组参数一律用 `emscripten::val` + `vecFromJSArray<uint8_t>` 手动转换（tui-pdf 的 packed+offsets 模式）。
+- iOS 15 deployment target 下 libc++ 的**浮点 `std::to_chars` 标记为 iOS 16.3+ 可用**（Windows MSVC / Android NDK libc++ 均可用，只有 iOS CI 挂）——double 最短往返格式化统一用 prec 1..17 的 `%.*g` + strtod 往返验证搜索（xlsx_json.h 的 `FormatDoubleShortest`），整数输出无小数点、行为与 to_chars 等价且跨端一致。
 - Node 测试脚本同时加载多个 uasm WASM 模块时，`locateFile` 必须给每个模块返回**不同的 URL**（否则 http server 按路由返回错文件，embind 绑定静默错位、导出残缺）。
 - 多图传递约定（napi/embind 同构）：胶水层把所有图拼成一个大 Uint8Array + 平铺 offsets `[start0,len0,start1,len1,...]`，绑定层再拆分——避免 napi 遍历对象数组与 embind 嵌套 vector 的跨端差异。
 - uni-gyp 的 `libraries` 条目会被加 `-l` 前缀——链接预编译静态库（.a）一律走 `ldflags` 原样传绝对路径（CMake 把 ldflags 输出在 objects 之后，顺序满足单遍解析）；gyp `sources` 里的 .a 会被 CMake 忽略（.so 只有几 KB 且符号全 U，被 `--unresolved-symbols=ignore-all` 掩盖，务必 nm 验证）。

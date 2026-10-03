@@ -6,9 +6,10 @@
 // 无异常（-fno-exceptions），失败一律返回 false / nullptr。
 // 只被 xlsx_core.cc include（单编译单元），绑定层不直接使用。
 
-#include <charconv>
 #include <cstdint>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -286,15 +287,26 @@ void WriteString(std::string& out, const std::string& s) {
 	out.push_back('"');
 }
 
+// 跨平台 double 最短往返格式化（iOS 15 的 libc++ 无浮点 to_chars，iOS 16.3+ 才有）
+// prec 1..17 依次尝试 %.*g，第一个能 strtod 精确往返的即最短：
+// 整数值输出无小数点（45123 → "45123"），小数最短（3.14 → "3.14"）
+inline int FormatDoubleShortest(char* buf, size_t size, double v) {
+	for (int prec = 1; prec <= 17; ++prec) {
+		const int n = snprintf(buf, size, "%.*g", prec, v);
+		if (n <= 0 || static_cast<size_t>(n) >= size) break;
+		if (strtod(buf, nullptr) == v) return n;
+	}
+	return snprintf(buf, size, "%.17g", v);
+}
+
 void WriteNumber(std::string& out, double v) {
 	char buf[40];
-	// to_chars shortest：整数值输出无小数点（45123 → "45123"），小数最短往返
-	const auto res = std::to_chars(buf, buf + sizeof(buf), v);
-	if (res.ec != std::errc()) {
+	const int n = FormatDoubleShortest(buf, sizeof(buf), v);
+	if (n <= 0) {
 		out += "0";
 		return;
 	}
-	out.append(buf, res.ptr);
+	out.append(buf, static_cast<size_t>(n));
 }
 
 }  // namespace json_detail
