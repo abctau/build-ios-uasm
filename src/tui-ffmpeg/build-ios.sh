@@ -81,6 +81,7 @@ lib_path() {
 #    -iphonesimulator.a : simulator fat (arm64 + x86_64)
 #    binding.gyp references them via libUasmFfmpegLibs-$(PLATFORM_NAME).a so each
 #    xcframework slot links the matching platform build (Xcode 26 rejects mixed metadata).
+mkdir -p "$OUT_BASE"
 merge_arch() {
   local OUT=$1
   shift
