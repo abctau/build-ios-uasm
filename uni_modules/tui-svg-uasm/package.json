@@ -1,7 +1,7 @@
 {
 	"id": "tui-svg-uasm",
 	"displayName": "tui-svg-uasm",
-	"version": "0.0.1",
+	"version": "0.1.0",
 	"description": "UASM SVG 渲染插件：SVG 转 PNG 光栅化，纯C++实现",
 	"keywords": [
 		"image",
@@ -35,7 +35,7 @@
 			"permissions": "无"
 		},
 		"npmurl": "",
-		"vapor": "y",
+		"vapor": "√",
 		"darkmode": "x",
 		"i18n": "x",
 		"widescreen": "x"
@@ -45,9 +45,9 @@
 		"encrypt": [],
 		"platforms": {
 			"cloud": {
-				"tcb": "y",
-				"aliyun": "y",
-				"alipay": "y"
+				"tcb": "√",
+				"aliyun": "√",
+				"alipay": "√"
 			},
 			"client": {
 				"uni-app": {
@@ -85,17 +85,17 @@
 				},
 				"uni-app-x": {
 					"web": {
-						"safari": "y",
-						"chrome": "y"
+						"safari": "√",
+						"chrome": "√"
 					},
 					"app": {
-						"android": "y",
-						"ios": "y",
-						"harmony": "y"
+						"android": "√",
+						"ios": "√",
+						"harmony": "√"
 					},
 					"mp": {
-						"weixin": "y",
-						"alipay": "y"
+						"weixin": "√",
+						"alipay": "√"
 					}
 				}
 			}
