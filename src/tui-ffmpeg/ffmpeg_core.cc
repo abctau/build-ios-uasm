@@ -3,7 +3,6 @@
 #include <time.h>
 #include <pthread.h>
 
-#include <charconv>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -60,14 +59,25 @@ std::string CodecName(const AVCodecParameters* par, AVMediaType type) {
 	return name != nullptr ? std::string(name) : "unknown";
 }
 
+// 跨平台 double 最短往返格式化（iOS 15 的 libc++ 无浮点 to_chars，iOS 16.3+ 才有），
+// 与 tui-xlsx 的 FormatDoubleShortest 同一实现：prec 1..17 的 %.*g + strtod 往返验证
+int FormatDoubleShortest(char* buf, size_t size, double v) {
+	for (int prec = 1; prec <= 17; ++prec) {
+		const int n = std::snprintf(buf, size, "%.*g", prec, v);
+		if (n <= 0 || static_cast<size_t>(n) >= size) break;
+		if (std::strtod(buf, nullptr) == v) return n;
+	}
+	return std::snprintf(buf, size, "%.17g", v);
+}
+
 void AppendNum(std::string& out, double v) {
 	char buf[40];
-	const auto res = std::to_chars(buf, buf + sizeof(buf), v);
-	if (res.ec != std::errc()) {
+	const int n = FormatDoubleShortest(buf, sizeof(buf), v);
+	if (n <= 0) {
 		out += "0";
 		return;
 	}
-	out.append(buf, res.ptr);
+	out.append(buf, static_cast<size_t>(n));
 }
 
 void AppendInt(std::string& out, int64_t v) {
