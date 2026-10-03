@@ -4,7 +4,7 @@
 		<text class="text">getMediaInfo + extractFrame + B 方案转码（videoCrop/clip/speed/compress/effect/PiP），逐项校验。</text>
 
 		<button class="btn" :disabled="running" @click="runTest">运行解析测试</button>
-		<button class="btn" :disabled="running" @click="runTranscodeTest" v-if="isApp">运行转码测试（B 方案）</button>
+		<button class="btn" :disabled="running" @click="runTranscodeTest" v-if="hasTranscode">运行转码测试（B 方案）</button>
 
 		<view class="step" v-for="(item, i) in steps" :key="i">
 			<text class="step-name">{{ item.name }}</text>
@@ -36,11 +36,11 @@
 	const frame2 = ref<Uint8Array>(new Uint8Array(0))
 	const frame1Src = ref("")
 	const frame2Src = ref("")
-	// #ifdef APP-ANDROID || APP-HARMONY || APP-IOS
-	const isApp = ref(true)
+	// #ifndef MP-WEIXIN || MP-ALIPAY
+	const hasTranscode = ref(true)
 	// #endif
-	// #ifndef APP-ANDROID || APP-HARMONY || APP-IOS
-	const isApp = ref(false)
+	// #ifdef MP-WEIXIN || MP-ALIPAY
+	const hasTranscode = ref(false)
 	// #endif
 
 	function addStep(name : string, ok : boolean, detail : string) {
@@ -76,12 +76,85 @@
 			'durationMs=' + info.durationMs + sizeDesc + ' streams=' + info.streams.length)
 	}
 
-	async function runTranscodeTest() {
+	// #ifdef WEB
+	// Web 端：URL 进 → 返回 Uint8Array；用 Blob objectURL 走 getMediaInfo 校验
+	async function webProbe(bytes : Uint8Array, label : string) {
+		const url = URL.createObjectURL(new Blob([bytes as any], { type: 'video/mp4' }))
+		const info = await getMediaInfo(url)
+		const v = info.streams.find((s) : boolean => s.type == 'video')
+		let sizeDesc = ''
+		if (v != null) {
+			sizeDesc = ' ' + v.width + 'x' + v.height
+		}
+		addStep(label, true, 'durationMs=' + info.durationMs + sizeDesc + ' streams=' + info.streams.length)
+		return url
+	}
+
+	async function runTranscodeTestWeb() {
 		errorMessage.value = ""
 		summary.value = ""
 		steps.value = []
 		running.value = true
 		try {
+			// 1. videoCrop
+			const u1 = await webProbe(await videoCrop('/static/test-video.mp4', 0, 0, 640, 480), 'videoCrop 640x480')
+
+			// 2. durationClip
+			const u2 = await webProbe(await durationClip('/static/test-video.mp4', 0, 3000), 'durationClip')
+			const info2 = await getMediaInfo(u2)
+			addStep('durationClip 3s', info2.durationMs > 1500 && info2.durationMs <= 4500,
+				'durationMs=' + info2.durationMs)
+
+			// 3. videoSpeed 1.5x
+			const u3 = await webProbe(await videoSpeed('/static/test-video.mp4', 1.5), 'videoSpeed 1.5x')
+			const info3 = await getMediaInfo(u3)
+			addStep('videoSpeed 1.5x 时长', info3.durationMs > 5000 && info3.durationMs < 8000,
+				'durationMs=' + info3.durationMs)
+
+			// 4. videoCompress
+			const u4 = await webProbe(await videoCompress('/static/test-video.mp4', 640, 360, 800), 'videoCompress 640x360')
+			const info4 = await getMediaInfo(u4)
+			const v4 = info4.streams.find((s) : boolean => s.type == 'video')
+			addStep('videoCompress 尺寸', v4 != null && v4.width == 640 && v4.height == 360,
+				'size=' + (v4 != null ? (v4.width.toString() + 'x' + v4.height.toString()) : 'null'))
+
+			// 5. videoEffect 黑白
+			await webProbe(await videoEffect('/static/test-video.mp4', 'grayscale'), 'videoEffect grayscale')
+
+			// 6. audioMerge 混音
+			const u6 = await webProbe(await audioMerge('/static/test-video.mp4', '/static/test-video.mp4'), 'audioMerge')
+			const info6 = await getMediaInfo(u6)
+			addStep('audioMerge 流数', info6.streams.length >= 1, 'streams=' + info6.streams.length)
+
+			// 7. PiP
+			await webProbe(await videoPictureInPicture('/static/test-video.mp4', '/static/test-video.mp4', 20, 20, 320, 180), 'videoPictureInPicture 320x180@20,20')
+
+			// 8. 转码产物抽帧
+			const png = await extractFrame(u4, 2000, 160)
+			addStep('转码产物抽帧', png.length > 300, 'PNG ' + png.length + ' B')
+
+			const list = steps.value
+			let allPass = true
+			for (let i = 0; i < list.length; i++) {
+				if (!list[i].ok) {
+					allPass = false
+				}
+			}
+			if (allPass) {
+				summary.value = '✓ 转码全部 ' + list.length + ' 项通过'
+			} else {
+				errorMessage.value = '存在失败项，请查看控制台日志'
+			}
+		} catch (e) {
+			console.log(e)
+			errorMessage.value = '转码测试异常中断：' + (e instanceof Error ? e.message : e.toString())
+		}
+		running.value = false
+	}
+	// #endif
+
+	// #ifndef WEB
+	async function runTranscodeTestNonWeb() {
 			// 1. videoCrop 裁剪画面（重编码）
 			const p1 = outPath('crop')
 			await videoCrop('/static/test-video.mp4', 0, 0, 640, 480, p1)
@@ -146,6 +219,16 @@
 			errorMessage.value = '转码测试异常中断：' + (e instanceof Error ? e.message : e.toString())
 		}
 		running.value = false
+	}
+	// #endif
+
+	async function runTranscodeTest() {
+		// #ifdef WEB
+		await runTranscodeTestWeb()
+		// #endif
+		// #ifndef WEB
+		await runTranscodeTestNonWeb()
+		// #endif
 	}
 
 	async function runTest() {

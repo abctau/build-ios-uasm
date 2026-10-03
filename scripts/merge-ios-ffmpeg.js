@@ -12,7 +12,17 @@ const { execFileSync } = require('child_process')
 const root = path.resolve(__dirname, '..')
 const xcfDir = path.join(root, 'build', 'ios', 'xcframework')
 const modName = 'UasmTuiFfmpegUasm'
-const xcf = path.join(xcfDir, modName + '.xcframework')
+const xcf = path.join(pluginLibParent(), modName + '.xcframework')
+
+// uni-gyp lays out xcframeworks under build/ios/xcframework/<Configuration>/;
+// fall back to the bare dir for older layouts.
+function pluginLibParent() {
+  const direct = path.join(xcfDir, modName + '.xcframework')
+  if (fs.existsSync(direct)) return xcfDir
+  const rel = path.join(xcfDir, 'Release')
+  if (fs.existsSync(path.join(rel, modName + '.xcframework'))) return rel
+  return rel
+}
 const pluginLib = path.join(root, 'src', 'tui-ffmpeg', 'vendor', 'ffmpeg', 'lib', 'ios')
 
 if (!fs.existsSync(xcf)) {
