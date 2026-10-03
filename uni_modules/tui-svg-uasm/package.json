@@ -2,7 +2,7 @@
 	"id": "tui-svg-uasm",
 	"displayName": "tui-svg-uasm",
 	"version": "0.0.1",
-	"description": "UASM SVG 渲染插件：nanosvg 光栅化 SVG 为 PNG（getInfo / render / renderSize）",
+	"description": "UASM SVG 渲染插件：SVG 转 PNG 光栅化，纯C++实现",
 	"keywords": [
 		"image",
 		"缩放",

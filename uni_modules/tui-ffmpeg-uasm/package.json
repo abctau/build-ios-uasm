@@ -2,7 +2,7 @@
 	"id": "tui-ffmpeg-uasm",
 	"displayName": "tui-ffmpeg-uasm",
 	"version": "0.0.1",
-	"description": "UASM ffmpeg 插件：媒体信息解析 + 视频抽帧（LGPL，无编码器）",
+	"description": "UASM ffmpeg 插件：媒体解析/抽帧/转码，纯C++实现",
 	"keywords": [
 		"image",
 		"缩放",

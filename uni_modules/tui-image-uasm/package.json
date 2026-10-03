@@ -2,7 +2,7 @@
 	"id": "tui-image-uasm",
 	"displayName": "tui-image-uasm 图片处理",
 	"version": "0.1.0",
-	"description": "UASM 版图片处理：缩放/裁剪/旋转/格式转换压缩 + 主色调色板提取（stb 系列）",
+	"description": "UASM 图片处理插件：缩放/裁剪/旋转/格式转换，纯C++实现",
 	"keywords": [
 		"image",
 		"缩放",

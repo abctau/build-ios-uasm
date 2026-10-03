@@ -2,12 +2,12 @@
 	"id": "tui-xlsx-uasm",
 	"displayName": "tui-xlsx-uasm",
 	"version": "0.0.1",
-	"description": "UASM xlsx 插件：多 sheet Excel 读写（字符串/数字/布尔），OOXML + zip 打包",
+	"description": "UASM xlsx 插件：多 sheet Excel 读写，纯C++实现",
 	"keywords": [
-		"image",
-		"缩放",
-		"压缩",
-		"调色板",
+		"xlsx",
+		"excel",
+		"表格",
+		"读写",
 		"uasm"
 	],
 	"repository": "",
@@ -35,7 +35,7 @@
 			"permissions": "无"
 		},
 		"npmurl": "",
-		"vapor": "y",
+		"vapor": "√",
 		"darkmode": "x",
 		"i18n": "x",
 		"widescreen": "x"
@@ -45,9 +45,9 @@
 		"encrypt": [],
 		"platforms": {
 			"cloud": {
-				"tcb": "y",
-				"aliyun": "y",
-				"alipay": "y"
+				"tcb": "√",
+				"aliyun": "√",
+				"alipay": "√"
 			},
 			"client": {
 				"uni-app": {
@@ -85,17 +85,17 @@
 				},
 				"uni-app-x": {
 					"web": {
-						"safari": "y",
-						"chrome": "y"
+						"safari": "√",
+						"chrome": "√"
 					},
 					"app": {
-						"android": "y",
-						"ios": "y",
-						"harmony": "y"
+						"android": "√",
+						"ios": "√",
+						"harmony": "√"
 					},
 					"mp": {
-						"weixin": "y",
-						"alipay": "y"
+						"weixin": "√",
+						"alipay": "√"
 					}
 				}
 			}

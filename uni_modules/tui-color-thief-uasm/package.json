@@ -2,7 +2,7 @@
 	"id": "tui-color-thief-uasm",
 	"displayName": "tui-color-thief-uasm 图片主色提取",
 	"version": "0.1.0",
-	"description": "UASM 版图片主色/调色板/四边颜色提取（median-cut 算法 + stb_image 解码）",
+	"description": "UASM 图片主色/调色板提取插件，纯C++实现",
 	"keywords": [
 		"color-thief",
 		"主色",
@@ -34,7 +34,7 @@
 			"permissions": "无"
 		},
 		"npmurl": "",
-		"vapor": "y",
+		"vapor": "√",
 		"darkmode": "x",
 		"i18n": "x",
 		"widescreen": "x"
@@ -44,9 +44,9 @@
 		"encrypt": [],
 		"platforms": {
 			"cloud": {
-				"tcb": "y",
-				"aliyun": "y",
-				"alipay": "y"
+				"tcb": "√",
+				"aliyun": "√",
+				"alipay": "√"
 			},
 			"client": {
 				"uni-app": {
@@ -84,17 +84,17 @@
 				},
 				"uni-app-x": {
 					"web": {
-						"safari": "y",
-						"chrome": "y"
+						"safari": "√",
+						"chrome": "√"
 					},
 					"app": {
-						"android": "y",
-						"ios": "y",
-						"harmony": "y"
+						"android": "√",
+						"ios": "√",
+						"harmony": "√"
 					},
 					"mp": {
-						"weixin": "y",
-						"alipay": "y"
+						"weixin": "√",
+						"alipay": "√"
 					}
 				}
 			}

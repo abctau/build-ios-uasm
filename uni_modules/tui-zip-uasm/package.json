@@ -2,7 +2,7 @@
 	"id": "tui-zip-uasm",
 	"displayName": "tui-zip-uasm 压缩解压",
 	"version": "0.1.0",
-	"description": "UASM 版 ZIP 打包/解压与 gzip 压缩解压（miniz 实现，纯内存操作）",
+	"description": "UASM ZIP 打包解压/gzip 压缩插件，纯C++实现",
 	"keywords": [
 		"zip",
 		"gzip",
