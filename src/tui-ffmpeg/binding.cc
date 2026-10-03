@@ -148,34 +148,9 @@ napi_value ExtractFrame(napi_env env, napi_callback_info info) {
 }
 
 
-// ---------- runJob（异步转码任务：JSON options → result JSON） ----------
-
-struct JobCarrier {
-	std::string optionsJson;
-	tui::JobOptions opt;
-	std::string err;
-	bool ok = false;
-	napi_async_work work = nullptr;
-	napi_deferred deferred = nullptr;
-};
-
-void JobExecute(napi_env env, void* data) {
-	auto* c = static_cast<JobCarrier*>(data);
-	if (!tui::ParseJobOptions(c->optionsJson, c->opt, c->err)) return;
-	std::vector<uint8_t> unused;
-	c->ok = tui::TranscodeRun(c->opt, unused, c->err);
-}
-
-void JobComplete(napi_env env, napi_status, void* data) {
-	auto* c = static_cast<JobCarrier*>(data);
-	napi_value res;
-	std::string out = c->ok ? "{\"ok\":true}" : "{\"ok\":false,\"error\":\"" + c->err + "\"}";
-	napi_create_string_utf8(env, out.c_str(), out.size(), &res);
-	if (c->ok) napi_resolve_deferred(env, c->deferred, res);
-	else napi_reject_deferred(env, c->deferred, res);
-	napi_delete_async_work(env, c->work);
-	delete c;
-}
+// ---------- runJob（同步转码任务：JSON options → result JSON） ----------
+// 说明：iOS uasm 运行时不导出 napi_create_async_work，异步实现会让整个插件 dlopen
+// 失败；改为同步执行（阻塞 JS 线程直到转码完成），错误通过 napi_throw_type_error 抛出。
 
 napi_value RunJob(napi_env env, napi_callback_info info) {
 	size_t argc = 1;
@@ -190,23 +165,21 @@ napi_value RunJob(napi_env env, napi_callback_info info) {
 	std::string optionsJson(len, 0);
 	napi_get_value_string_utf8(env, argv[0], optionsJson.data(), len + 1, &len);
 
-	auto* c = new JobCarrier();
-	c->optionsJson = optionsJson;
-	napi_value name, promise;
-	napi_create_string_utf8(env, "ffmpeg-job", NAPI_AUTO_LENGTH, &name);
-	if (napi_create_promise(env, &c->deferred, &promise) != napi_ok) {
-		delete c;
-		napi_throw_type_error(env, nullptr, "create promise failed");
+	tui::JobOptions opt;
+	std::string err;
+	if (!tui::ParseJobOptions(optionsJson, opt, err)) {
+		napi_throw_type_error(env, nullptr, err.c_str());
 		return nullptr;
 	}
-	if (napi_create_async_work(env, nullptr, name, JobExecute, JobComplete, c,
-	                           &c->work) != napi_ok) {
-		delete c;
-		napi_throw_type_error(env, nullptr, "create async work failed");
+	std::vector<uint8_t> unused;
+	if (!tui::TranscodeRun(opt, unused, err)) {
+		napi_throw_type_error(env, nullptr, err.c_str());
 		return nullptr;
 	}
-	napi_queue_async_work(env, c->work);
-	return promise;
+	napi_value res;
+	const char* out = "{\"ok\":true}";
+	napi_create_string_utf8(env, out, static_cast<size_t>(strlen(out)), &res);
+	return res;
 }
 
 napi_value Init(napi_env env, napi_value exports) {

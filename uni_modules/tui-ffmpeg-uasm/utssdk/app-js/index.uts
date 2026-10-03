@@ -3,8 +3,20 @@ import { type MediaInfo } from '../interface.uts'
 /**
  * App/小程序端实现：getMediaInfo 网络媒体优先 Range 拉头部快速解析，
  * 失败回退 downloadFile 全量；extractFrame 始终全量。
- * B 方案转码 12 API：path 进 path 出，底层 native runJob（异步线程）。
+ * B 方案转码 12 API：path 进 path 出，底层 native runJob 同步执行。
  */
+
+let lib : any = null
+
+/**
+ * 同步加载原生插件（App 端 uni.loadUasmSync，瞬时完成）。
+ */
+function getLib() : any {
+	if (lib == null) {
+		lib = uni.loadUasmSync('uni_modules/tui-ffmpeg-uasm')
+	}
+	return lib as any
+}
 
 function downloadToTemp(url: string): Promise<string> {
 	return new Promise<string>((resolve, reject) => {
@@ -89,7 +101,7 @@ export async function getMediaInfo(path : string) : Promise<MediaInfo> {
 		const r = await requestRangeBytes(path)
 		if (r != null) {
 			try {
-				const lib = await uni.loadUasm('uni_modules/tui-ffmpeg-uasm')
+				const lib = getLib()
 				const json = lib.getMediaInfo(r.bytes) as string
 				return JSON.parse(json) as MediaInfo
 			} catch (e) {
@@ -101,7 +113,7 @@ export async function getMediaInfo(path : string) : Promise<MediaInfo> {
 		}
 	}
 	const bytes = await readBytes(path)
-	const lib = await uni.loadUasm('uni_modules/tui-ffmpeg-uasm')
+	const lib = getLib()
 	const json = lib.getMediaInfo(bytes) as string
 	return JSON.parse(json) as MediaInfo
 }
@@ -116,7 +128,7 @@ export async function extractFrame(path : string, timeMs : number, maxWidth : nu
 		throw new Error('tui-ffmpeg: path is empty')
 	}
 	const bytes = await readBytes(path)
-	const lib = await uni.loadUasm('uni_modules/tui-ffmpeg-uasm')
+	const lib = getLib()
 	return lib.extractFrame(bytes, timeMs, maxWidth) as Uint8Array
 }
 
@@ -176,7 +188,6 @@ function resolveOutputPath(path : string) : string {
 }
 
 async function runJobToPath(options : UTSJSONObject) : Promise<boolean> {
-	const lib = await uni.loadUasm('uni_modules/tui-ffmpeg-uasm')
 	const inputs = options.getArray('inputs')
 	if (inputs != null) {
 		const resolved : string[] = []
@@ -191,12 +202,12 @@ async function runJobToPath(options : UTSJSONObject) : Promise<boolean> {
 		options.set('output', resolveOutputPath(out))
 	}
 	const json = JSON.stringify(options)
-	const res = await lib.runJob(json) as string
-	const parsed = JSON.parse(res) as UTSJSONObject
-	const ok = parsed.getBoolean('ok') ?? false
-	if (!ok) {
-		const error = parsed.getString('error') ?? 'unknown error'
-		throw new Error('tui-ffmpeg: transcode failed: ' + error)
+	// native runJob 同步执行（阻塞到转码完成），失败直接抛异常
+	try {
+		getLib().runJob(json)
+	} catch (e) {
+		console.log(e)
+		throw new Error('tui-ffmpeg: transcode failed: ' + (e instanceof Error ? e.message : JSON.stringify(e)))
 	}
 	return true
 }

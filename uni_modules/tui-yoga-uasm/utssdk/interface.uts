@@ -3,6 +3,10 @@
  *
  * 布局引擎（yoga 3.x）：声明式树常驻 C 侧，增量 API + 批量布局结果。
  * 支持平台：App-Android / App-iOS / App-Harmony / Web / 微信小程序 / 支付宝小程序。
+ *
+ * 调用约定：
+ * - App 端：全部函数同步调用（uni.loadUasmSync 内部自动加载）。
+ * - Web/小程序端：wasm 加载是异步的，先 `await init()` 一次，之后全部函数同步调用。
  */
 
 /** 单节点布局结果 */
@@ -26,7 +30,3 @@ export interface YogaFrame {
  * margin 与 padding 与 border 系（Top/Right/Bottom/Left/H/V/All）、gapRow/gapColumn
  */
 export type YogaStyleJson = string
-
-export type CreateNode = () => Promise<number>
-export type RegisterStyle = (propsJson : string) => Promise<number>
-export type CalculateLayout = (rootId : number, availWidth : number, availHeight : number) => Promise<YogaFrame[]>
