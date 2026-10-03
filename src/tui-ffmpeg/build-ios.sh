@@ -70,15 +70,21 @@ build_one iphonesimulator "-mios-simulator-version-min=$DEPLOY" x86_64 "--disabl
 
 LIBS="libavfilter.a libswresample.a libavformat.a libavcodec.a libswscale.a libavutil.a"
 
+# static libs land in per-lib subdirs (e.g. build-ios-iphoneos/libavfilter/libavfilter.a)
+lib_path() {
+  local BUILD=$1 L=$2
+  echo "$BUILD/${L%.a}/$L"
+}
+
 # 4. device libs (arm64)
 mkdir -p "$OUT_BASE/iphoneos"
 for L in $LIBS; do
-  cp "$FF_SRC/build-ios-iphoneos/$L" "$OUT_BASE/iphoneos/$L"
+  cp "$(lib_path "$FF_SRC/build-ios-iphoneos" "$L")" "$OUT_BASE/iphoneos/$L"
 done
 # simulator fat (arm64 + x86_64 via lipo)
 mkdir -p "$OUT_BASE/iphonesimulator"
 for L in $LIBS; do
-  lipo -create "$FF_SRC/build-ios-sim-arm64/$L" "$FF_SRC/build-ios-sim-x64/$L" \
+  lipo -create "$(lib_path "$FF_SRC/build-ios-sim-arm64" "$L")" "$(lib_path "$FF_SRC/build-ios-sim-x64" "$L")" \
     -output "$OUT_BASE/iphonesimulator/$L"
 done
 
