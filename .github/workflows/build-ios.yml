@@ -67,8 +67,16 @@ jobs:
       - name: Install deps
         run: npm install
 
+      - name: Build ffmpeg iOS static libs
+        if: matrix.script == 'tui-ffmpeg'
+        run: bash src/tui-ffmpeg/build-ios.sh
+
       - name: Build iOS xcframework (${{ matrix.module }})
         run: npm run build:${{ matrix.script }}:ios:release
+
+      - name: Merge ffmpeg libs into xcframework
+        if: matrix.script == 'tui-ffmpeg'
+        run: node scripts/merge-ios-ffmpeg.js
 
       - name: Pack uni_modules
         run: npm run build:${{ matrix.script }}:pack:uni-module:release

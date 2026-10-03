@@ -101,8 +101,13 @@ class FormatSession {
 		                           SeekCb);
 		if (avio_ == nullptr) return false;
 		fmt_->pb = avio_;
-		if (avformat_open_input(&fmt_, "", nullptr, nullptr) < 0) return false;
-		if (avformat_find_stream_info(fmt_, nullptr) < 0) return false;
+		const int eOpen = avformat_open_input(&fmt_, "", nullptr, nullptr);
+		if (eOpen < 0) {
+			return false;
+		}
+		if (avformat_find_stream_info(fmt_, nullptr) < 0) {
+			return false;
+		}
 		opened_ = true;
 		return true;
 	}

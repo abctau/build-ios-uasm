@@ -41,7 +41,7 @@ fs.mkdirSync(outDir, { recursive: true })
 const outJs = path.join(outDir, 'tui-ffmpeg-uasm.js')
 
 const ffmpegLib = path.join(root, 'src', 'tui-ffmpeg', 'vendor', 'ffmpeg', 'lib', 'wasm')
-for (const name of ['libavformat.a', 'libavcodec.a', 'libswscale.a', 'libavutil.a']) {
+for (const name of ['libavfilter.a', 'libswresample.a', 'libavformat.a', 'libavcodec.a', 'libswscale.a', 'libavutil.a']) {
   if (!fs.existsSync(path.join(ffmpegLib, name))) {
     console.error('[build-wasm-tui-ffmpeg] missing ' + name + ' in ' + ffmpegLib)
     console.error('[build-wasm-tui-ffmpeg] copy from E:/ffmpeg-spike/ffmpeg-7.1.1/build-emscripten/lib*/')
@@ -56,7 +56,7 @@ const commonFlags = [
   '-s', 'WASM=1',
   '-s', 'ALLOW_MEMORY_GROWTH=1',
   '-s', 'INITIAL_MEMORY=64MB',
-  '-s', 'STACK_SIZE=2MB',
+  '-s', 'STACK_SIZE=8MB',
   '-s', 'EXPORTED_FUNCTIONS=["_malloc","_free"]',
   '-s', 'DYNAMIC_EXECUTION=0',
   '-O2',
@@ -76,6 +76,11 @@ const steps = [
     label: 'ffmpeg_core.cc',
     args: [path.join(root, 'src', 'tui-ffmpeg', 'ffmpeg_core.cc'), ...commonIncludes, '-std=c++20', '-fno-exceptions', '-c'],
     out: 'tui-ffmpeg-core.o',
+  },
+  {
+    label: 'transcode_core.cc',
+    args: [path.join(root, 'src', 'tui-ffmpeg', 'transcode_core.cc'), ...commonIncludes, '-std=c++20', '-fno-exceptions', '-c'],
+    out: 'tui-ffmpeg-transcode.o',
   },
 ]
 
@@ -106,6 +111,8 @@ const objs = steps.map((step) => {
 // static libs must come after objects (single pass ld)
 const linkArgs = [
   ...objs,
+  path.join(ffmpegLib, 'libavfilter.a'),
+  path.join(ffmpegLib, 'libswresample.a'),
   path.join(ffmpegLib, 'libavformat.a'),
   path.join(ffmpegLib, 'libavcodec.a'),
   path.join(ffmpegLib, 'libswscale.a'),

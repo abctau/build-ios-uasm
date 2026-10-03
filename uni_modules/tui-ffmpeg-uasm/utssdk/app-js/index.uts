@@ -1,7 +1,9 @@
 import { type MediaInfo } from '../interface.uts'
 
 /**
- * App/小程序端实现：网络媒体先 downloadFile，再读文件字节，交给 UASM 模块解析/抽帧。
+ * App/小程序端实现：getMediaInfo 网络媒体优先 Range 拉头部快速解析，
+ * 失败回退 downloadFile 全量；extractFrame 始终全量。
+ * B 方案转码 12 API：path 进 path 出，底层 native runJob（异步线程）。
  */
 
 function downloadToTemp(url: string): Promise<string> {
@@ -44,35 +46,332 @@ async function readBytes(path: string): Promise<Uint8Array> {
 	return new Uint8Array(await readLocalBytes(path))
 }
 
+function requestRangeBytes(url : string) : Promise<RangeFetchResult | null> {
+	const header = new Map<string, string>()
+	header.set('Range', 'bytes=0-524287')
+	return new Promise<RangeFetchResult | null>((resolve) => {
+		uni.request({
+			url: url,
+			header: header,
+			responseType: 'arraybuffer',
+			success: (res) => {
+				if (res.statusCode == 206 || res.statusCode == 200) {
+					const r : RangeFetchResult = {
+						bytes: new Uint8Array(res.data as ArrayBuffer),
+						isFull: res.statusCode == 200
+					}
+					resolve(r)
+				} else {
+					resolve(null)
+				}
+			},
+			fail: () => {
+				resolve(null)
+			}
+		})
+	})
+}
+
+interface RangeFetchResult {
+	bytes : Uint8Array
+	isFull : boolean
+}
+
+/**
+ * 网络媒体先尝试 Range 只拉头部（moov 在头部时可免全量下载解析出时长）；
+ * 解析失败（moov 在尾部等）回退全量下载。
+ */
 export async function getMediaInfo(path : string) : Promise<MediaInfo> {
 	if (path.length == 0) {
 		throw new Error('tui-ffmpeg: path is empty')
 	}
-	const bytes = await readBytes(path)
-	try {
-		const lib = await uni.loadUasm('uni_modules/tui-ffmpeg-uasm')
-		const json = lib.getMediaInfo(bytes) as string
-		return JSON.parse(json) as MediaInfo
-	} catch (e) {
-		console.log(e)
-		throw new Error('tui-ffmpeg: getMediaInfo failed')
+	if (path.startsWith('http://') || path.startsWith('https://')) {
+		const r = await requestRangeBytes(path)
+		if (r != null) {
+			try {
+				const lib = await uni.loadUasm('uni_modules/tui-ffmpeg-uasm')
+				const json = lib.getMediaInfo(r.bytes) as string
+				return JSON.parse(json) as MediaInfo
+			} catch (e) {
+				console.log(e)
+				if (r.isFull) {
+					throw new Error('tui-ffmpeg: getMediaInfo failed')
+				}
+			}
+		}
 	}
+	const bytes = await readBytes(path)
+	const lib = await uni.loadUasm('uni_modules/tui-ffmpeg-uasm')
+	const json = lib.getMediaInfo(bytes) as string
+	return JSON.parse(json) as MediaInfo
 }
 
 /**
  * 抽取 timeMs 附近（向后取关键帧）的视频帧，编码为 PNG。
  * maxWidth > 0 时等比缩放到该宽度；<= 0 保持原始尺寸。
+ * 注意：解码需完整数据，网络视频会全量下载。
  */
 export async function extractFrame(path : string, timeMs : number, maxWidth : number) : Promise<Uint8Array> {
 	if (path.length == 0) {
 		throw new Error('tui-ffmpeg: path is empty')
 	}
 	const bytes = await readBytes(path)
-	try {
-		const lib = await uni.loadUasm('uni_modules/tui-ffmpeg-uasm')
-		return lib.extractFrame(bytes, timeMs, maxWidth) as Uint8Array
-	} catch (e) {
-		console.log(e)
-		throw new Error('tui-ffmpeg: extractFrame failed')
+	const lib = await uni.loadUasm('uni_modules/tui-ffmpeg-uasm')
+	return lib.extractFrame(bytes, timeMs, maxWidth) as Uint8Array
+}
+
+// ---------- B 方案转码（12 API，path 进 path 出） ----------
+
+function checkPath(path : string) {
+	if (path.length == 0) {
+		throw new Error('tui-ffmpeg: path is empty')
 	}
+}
+
+function numToStr(n : number) : string {
+	const i = Math.round(n)
+	return i.toString()
+}
+
+/**
+ * effect 名 → ffmpeg 滤镜参数。共享逻辑两端各有一份。
+ */
+function effectToFilter(effect : string) : string {
+	if (effect == 'grayscale') return 'hue=s=0'
+	if (effect == 'negate') return 'negate'
+	if (effect == 'brighten') return 'eq=brightness=0.12'
+	if (effect == 'darken') return 'eq=brightness=-0.12'
+	if (effect == 'warm') return 'eq=gamma_r=1.15:gamma_b=0.85'
+	if (effect == 'cool') return 'eq=gamma_r=0.85:gamma_b=1.15'
+	return ''
+}
+
+/**
+ * path 模式转码：options 组 JSON（inputs 为文件路径数组，output 为目标路径），
+ * native runJob 在异步线程完成 读取→转码→写文件，返回 Promise<boolean>。
+ */
+async function runJobToPath(options : UTSJSONObject) : Promise<boolean> {
+	const lib = await uni.loadUasm('uni_modules/tui-ffmpeg-uasm')
+	const json = JSON.stringify(options)
+	const res = await lib.runJob(json) as string
+	const parsed = JSON.parse(res) as UTSJSONObject
+	const ok = parsed.getBoolean('ok') ?? false
+	if (!ok) {
+		const error = parsed.getString('error') ?? 'unknown error'
+		throw new Error('tui-ffmpeg: transcode failed: ' + error)
+	}
+	return true
+}
+
+/**
+ * 合并两个视频文件到一个输出（当前实现：主视频 + 两路音轨封装进同一容器，
+ * 非 concat 拼接）。
+ */
+export function videoMerge(videoPath : string, videoPath2 : string, outputPath : string) : Promise<boolean> {
+	checkPath(videoPath)
+	checkPath(videoPath2)
+	checkPath(outputPath)
+	return runJobToPath({
+		inputs: [videoPath, videoPath2],
+		output: outputPath,
+		videoCodec: 'copy',
+		audioCodec: 'copy'
+	} as UTSJSONObject)
+}
+
+/**
+ * 时长裁剪：从 startMs 起截取 durationMs 毫秒，音视频均直接拷贝（无重编码）。
+ */
+export function durationClip(videoPath : string, startMs : number, durationMs : number, outputPath : string) : Promise<boolean> {
+	checkPath(videoPath)
+	checkPath(outputPath)
+	if (durationMs <= 0) {
+		throw new Error('tui-ffmpeg: durationMs must be > 0')
+	}
+	return runJobToPath({
+		inputs: [videoPath],
+		output: outputPath,
+		videoCodec: 'copy',
+		audioCodec: 'copy',
+		startMs: startMs,
+		durationMs: durationMs
+	} as UTSJSONObject)
+}
+
+/**
+ * 音频裁剪：只输出音频轨（aac 直接拷贝）。
+ */
+export function audioClip(audioPath : string, startMs : number, durationMs : number, outputPath : string) : Promise<boolean> {
+	checkPath(audioPath)
+	checkPath(outputPath)
+	if (durationMs <= 0) {
+		throw new Error('tui-ffmpeg: durationMs must be > 0')
+	}
+	return runJobToPath({
+		inputs: [audioPath],
+		output: outputPath,
+		videoCodec: 'none',
+		audioCodec: 'copy',
+		startMs: startMs,
+		durationMs: durationMs
+	} as UTSJSONObject)
+}
+
+/**
+ * 两路音频混音（重编码为 aac；输出容器由 outputPath 扩展名决定）。
+ */
+export function audioMerge(audioPath : string, audioPath2 : string, outputPath : string) : Promise<boolean> {
+	checkPath(audioPath)
+	checkPath(audioPath2)
+	checkPath(outputPath)
+	return runJobToPath({
+		inputs: [audioPath, audioPath2],
+		output: outputPath,
+		videoCodec: 'none',
+		audioCodec: 'aac',
+		mixAudio: true
+	} as UTSJSONObject)
+}
+
+/**
+ * 裁剪画面区域（重编码为 mpeg4；audio 拷贝）。
+ */
+export function videoCrop(videoPath : string, x : number, y : number, width : number, height : number, outputPath : string) : Promise<boolean> {
+	checkPath(videoPath)
+	checkPath(outputPath)
+	if (width <= 0 || height <= 0) {
+		throw new Error('tui-ffmpeg: crop size must be > 0')
+	}
+	return runJobToPath({
+		inputs: [videoPath],
+		output: outputPath,
+		videoCodec: 'mpeg4',
+		audioCodec: 'copy',
+		videoFilter: 'crop=' + numToStr(width) + ':' + numToStr(height) + ':' + numToStr(x) + ':' + numToStr(y)
+	} as UTSJSONObject)
+}
+
+/**
+ * 变速（0.5~2.0，画面 setpts + 声音 atempo，重编码）。
+ * speed == 1.0 时等价于直接拷贝。
+ */
+export function videoSpeed(videoPath : string, speed : number, outputPath : string) : Promise<boolean> {
+	checkPath(videoPath)
+	checkPath(outputPath)
+	if (speed < 0.5 || speed > 2.0) {
+		throw new Error('tui-ffmpeg: speed must be in [0.5, 2.0]')
+	}
+	if (speed == 1.0) {
+		return runJobToPath({
+			inputs: [videoPath],
+			output: outputPath,
+			videoCodec: 'copy',
+			audioCodec: 'copy'
+		} as UTSJSONObject)
+	}
+	return runJobToPath({
+		inputs: [videoPath],
+		output: outputPath,
+		videoCodec: 'mpeg4',
+		audioCodec: 'aac',
+		videoFilter: 'setpts=PTS/' + speed.toString(),
+		audioFilter: 'atempo=' + speed.toString()
+	} as UTSJSONObject)
+}
+
+/**
+ * 透传任意视频滤镜链（逗号分隔），重编码为 mpeg4。
+ */
+export function videoFilter(videoPath : string, filter : string, outputPath : string) : Promise<boolean> {
+	checkPath(videoPath)
+	checkPath(outputPath)
+	if (filter.length == 0) {
+		throw new Error('tui-ffmpeg: filter is empty')
+	}
+	return runJobToPath({
+		inputs: [videoPath],
+		output: outputPath,
+		videoCodec: 'mpeg4',
+		audioCodec: 'copy',
+		videoFilter: filter
+	} as UTSJSONObject)
+}
+
+/**
+ * 压缩：等比缩放到 scaleWidth x scaleHeight + 指定码率（重编码为 mpeg4）。
+ * scale 传 0 表示该维度等比自适应。
+ */
+export function videoCompress(videoPath : string, scaleWidth : number, scaleHeight : number, videoBitrateKbps : number, outputPath : string) : Promise<boolean> {
+	checkPath(videoPath)
+	checkPath(outputPath)
+	return runJobToPath({
+		inputs: [videoPath],
+		output: outputPath,
+		videoCodec: 'mpeg4',
+		audioCodec: 'copy',
+		scaleWidth: scaleWidth,
+		scaleHeight: scaleHeight,
+		videoBitrateKbps: videoBitrateKbps
+	} as UTSJSONObject)
+}
+
+/**
+ * 内置滤镜效果：grayscale/negate/brighten/darken/warm/cool。
+ */
+export function videoEffect(videoPath : string, effect : string, outputPath : string) : Promise<boolean> {
+	checkPath(videoPath)
+	checkPath(outputPath)
+	const filter = effectToFilter(effect)
+	if (filter.length == 0) {
+		throw new Error('tui-ffmpeg: unknown effect ' + effect)
+	}
+	return runJobToPath({
+		inputs: [videoPath],
+		output: outputPath,
+		videoCodec: 'mpeg4',
+		audioCodec: 'copy',
+		videoFilter: filter
+	} as UTSJSONObject)
+}
+
+/**
+ * 画中画：把 pipVideoPath 缩放叠加到主视频 (x, y) 处（重编码为 mpeg4）。
+ */
+export function videoPictureInPicture(videoPath : string, pipVideoPath : string, x : number, y : number, width : number, height : number, outputPath : string) : Promise<boolean> {
+	checkPath(videoPath)
+	checkPath(pipVideoPath)
+	checkPath(outputPath)
+	if (width <= 0 || height <= 0) {
+		throw new Error('tui-ffmpeg: pip size must be > 0')
+	}
+	return runJobToPath({
+		inputs: [videoPath, pipVideoPath],
+		output: outputPath,
+		videoCodec: 'mpeg4',
+		audioCodec: 'copy',
+		overlay: {
+			x: x,
+			y: y,
+			width: width,
+			height: height
+		} as UTSJSONObject
+	} as UTSJSONObject)
+}
+
+/**
+ * 去水印（简化实现：裁剪掉水印区域，画面尺寸变为裁剪后大小）。
+ */
+export function imageRemoveWatermark(videoPath : string, x : number, y : number, width : number, height : number, outputPath : string) : Promise<boolean> {
+	checkPath(videoPath)
+	checkPath(outputPath)
+	if (width <= 0 || height <= 0) {
+		throw new Error('tui-ffmpeg: region size must be > 0')
+	}
+	return runJobToPath({
+		inputs: [videoPath],
+		output: outputPath,
+		videoCodec: 'mpeg4',
+		audioCodec: 'copy',
+		videoFilter: 'crop=' + numToStr(width) + ':' + numToStr(height) + ':' + numToStr(x) + ':' + numToStr(y)
+	} as UTSJSONObject)
 }

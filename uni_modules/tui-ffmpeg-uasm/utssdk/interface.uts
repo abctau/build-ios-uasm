@@ -16,3 +16,13 @@ export interface MediaInfo {
 	bitrate : number
 	streams : MediaStreamInfo[]
 }
+
+/**
+ * videoEffect 内置效果名：
+ * grayscale（黑白）、negate（反色）、brighten（提亮）、darken（压暗）、
+ * warm（暖色）、cool（冷色）
+ */
+export interface TranscodeJobResult {
+	ok : boolean
+	error : string
+}

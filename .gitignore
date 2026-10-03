@@ -5,3 +5,4 @@ build/
 web/
 *.log
 .DS_Store
+ffmpeg-spike-src/

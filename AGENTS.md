@@ -41,10 +41,11 @@
 │   ├── xlsx_zip.h/.cc           # 复制自 tui-zip zip_core（裁 gzip + maxUncompressed 解压炸弹防御）
 │   ├── binding.gyp              # target 名 UasmTuiXlsxUasm
 │   └── vendor/                  # miniz.h + zip.c/zip.h（kuba--/zip，MIT）
-├── src/tui-ffmpeg/              # ★ tui-ffmpeg 插件 C++ 源码（媒体解析+抽帧，链接预编译 ffmpeg 静态库）
+├── src/tui-ffmpeg/              # ★ tui-ffmpeg 插件 C++ 源码（媒体解析+抽帧+B方案转码，链接预编译 ffmpeg 静态库）
 │   ├── binding.cc / wasm_binding.cc / ffmpeg_core.h/.cc（内存 AVIO + swscale RGBA + stb PNG）
+│   ├── transcode_core.h/.cc     # B 方案转码引擎（runJob JSON 语义 / 统一 demux 分发 / 逻辑位置写 VecWriter）
 │   ├── binding.gyp              # target 名 UasmTuiFfmpegUasm；.a 走 ldflags 原样传（libraries 会被加 -l 前缀）
-│   └── vendor/ffmpeg/           # include/（官方子目录布局！平铺会让 libavutil/time.h 劫持系统头）+ lib/{arm64-v8a,x86_64,wasm}/*.a
+│   └── vendor/ffmpeg/           # include/（官方子目录布局！平铺会让 libavutil/time.h 劫持系统头）+ lib/{arm64-v8a,x86_64,ohos-arm64,ohos-x86_64,wasm}/*.a
 ├── scripts/
 │   ├── build-wasm-tui-color-thief.js   # 不依赖 make 的 WASM 构建脚本（需 EMSDK）
 │   └── pack-wasm-tui-color-thief.js    # 将 WASM 产物分发打包到 uni_modules
@@ -135,16 +136,19 @@ tui-xlsx（多 sheet Excel 读写，手写 OOXML 无外部 xlsx 库）：
 - `npm run build:tui-xlsx:all` / `build:tui-xlsx:all:wasm` — 依次执行
 - 实现要点：手写 JSON 子集 parser（xlsx_json.h）+ XML tokenizer（xlsx_xml.h），均无异常；xlsx_zip 复制 tui-zip zip_core 后加 `zip_entry_size` 读前防御（kuba zip 的 zip_entry_read 会按声称的未压缩大小 malloc，事后检查太晚）；插件不做文件 IO，保存/加载由调用方用 uni API 完成
 
-tui-ffmpeg（媒体解析+抽帧，链接预编译 ffmpeg 7.1.1 裁剪版静态库，LGPL）：
+tui-ffmpeg（媒体解析+抽帧+B方案转码，链接预编译 ffmpeg 7.1.1 裁剪版静态库，LGPL）：
 
-- API 2 个：`getMediaInfo(path)` → 容器/时长/流信息（h264/hevc/vp9/aac 等常见解码器）、`extractFrame(path, timeMs, maxWidth)` → PNG bytes（AVIO 内存流 + av_seek_frame BACKWARD + swscale RGBA + stb PNG）；无编码器/网络/滤镜，单条目无解压炸弹面
+- API：MVP 2 个 `getMediaInfo(path)`（http 优先 Range 拉头部快速解析）、`extractFrame(path, timeMs, maxWidth)` → PNG bytes；B 方案转码 12 个（对齐 DCloud 插件 16929 子集）：`videoMerge/durationClip/audioClip/audioMerge/videoCrop/videoSpeed/videoFilter/videoCompress/videoEffect/videoPictureInPicture/imageRemoveWatermark`（+getMediaInfo）。平台策略：App=path 进出（native runJob 异步线程）；Web=bytes 进出（同步阻塞，性能弱需标注）；**小程序端不支持转码**（胶水只导出占位抛错，保留解析+抽帧）
+- 转码引擎：native 单入口 `runJob(optionsJson)`（napi async work+Promise / embind 同步 bytes），12 API 语义由胶水拼 JSON：inputs（路径数组或占位 ['a','b']）+ output + videoCodec(copy|none|mpeg4) + audioCodec + videoFilter/audioFilter + startMs/durationMs + scaleWidth/scaleHeight + videoBitrateKbps + overlay{x,y,width,height} + mixAudio。视频输出编码只有内置 mpeg4（LGPL 禁 libx264），音频 aac
+- B 方案 configure 白名单（三个 build-*.sh 已固化）：`--enable-encoder=aac,mpeg4,png` + `--enable-muxer=mp4,ipod,adts,image2` + `--enable-filter=crop,scale,overlay,format,setpts,hue,eq,null,negate,atempo,amix,volume,aformat,anull,aresample`（**aresample 必须加**，aformat 格式协商隐式依赖，漏了报 "'aresample' filter not present"）+ image2/image2pipe demuxer + png/mjpeg decoder；vendor 每端 6 个 .a（新增 libavfilter/libswresample）
 - `npm run build:tui-ffmpeg:android:release` — Android（arm64 + x86_64）
 - `npm run build:tui-ffmpeg:harmony:release` — 鸿蒙（链接 vendor/ffmpeg/lib/ohos-arm64、ohos-x86_64 静态库；ffmpeg ohos 构建脚本 E:\ffmpeg-spike\build-harmony.sh）
-- `npm run build:tui-ffmpeg:ios:release` — iOS xcframework（需先出 ios .a，通常交给 CI）
+- `npm run build:tui-ffmpeg:ios:release` — iOS xcframework（**仅 CI/Mac 可构建**：先跑 `src/tui-ffmpeg/build-ios.sh` 产出 ffmpeg iOS 静态库（iphoneos/iphonesimulator，configure 走 xcrun clang + SDK sysroot，白名单同其他平台），uni-gyp 出 xcframework 后跑 `node scripts/merge-ios-ffmpeg.js` 用 `xcrun libtool -static` 把 libUasmFfmpegLibs.a 合进 xcframework 两个 slot 的二进制（ios-arm64 / ios-arm64_x86_64-simulator），再 module-pack；.gitignore 排除 ffmpeg-spike-src/（CI 现场从 ffmpeg.org 下载源码）
 - `npm run build:tui-ffmpeg:pack:uni-module:release` — module-pack 打包
 - `npm run build:tui-ffmpeg:wasm:release` / `pack:tui-ffmpeg:wasm:release` — WASM 构建/分发（wasm .a 在 vendor/ffmpeg/lib/wasm，来自 build-emscripten）
 - `npm run build:tui-ffmpeg:all` / `build:tui-ffmpeg:all:wasm` — 依次执行
-- 产物：Android .so ~5.5MB/abi、WASM ~4.2MB（brotli 后更小）；ffmpeg 构建方法论（msys 路径转换/CC_IDENT GBK/emconfigure 不可用等 8 坑）见 `E:\ffmpeg-spike\BUILD-NOTES.md`
+- 产物：Android .so ~5.5MB/abi、WASM ~4.8MB（brotli 后更小）；ffmpeg 构建方法论（msys 路径转换/CC_IDENT GBK/emconfigure 不可用等 8 坑）见 `E:\ffmpeg-spike\BUILD-NOTES.md`
+- 转码测试脚本：`unpackage/test-tui-ffmpeg-transcode.mjs`（10 用例 ALL PASS）+ `unpackage/test-tui-ffmpeg.mjs`（MVP 回归 6 用例）；**wasm 产物是 ENVIRONMENT=web**，Node 测试须用 http server + fetch 加载 .wasm（locateFile 给本地路径会 fetch file:// 失败）；排除法调试脚本 unpackage/debug-job.mjs
 
 WASM（需 emsdk，默认 `E:/emsdk`，可用环境变量 `EMSDK` 覆盖）：- `npm run build:tui-color-thief:wasm:release` — 编译 `src/tui-color-thief/` → `web/release/`
 - `npm run pack:tui-color-thief:wasm:release` — 分发到 `uasm/{web,mp-weixin,mp-alipay}`（小程序端自动 brotli 压缩）
@@ -194,6 +198,7 @@ WASM（需 emsdk，默认 `E:/emsdk`，可用环境变量 `EMSDK` 覆盖）：- 
 - embind 的 number 参数传了数组等错类型时会被转成 **NaN 而不是抛错**（napi 会抛），调用方拿 NaN 参与计算就静默失效——C 层对浮点参数做 `std::isfinite` 防御（image_core.cc EdgeBlurImage 的 regions），测试脚本的参数个数/类型要与 wasm 绑定签名严格一致。
 - uni_modules 插件的 package.json 若带 UTF-8 BOM，vite dev 按需加载时报 `"?{\n..." is not valid JSON`（loadPackageData），页面首次 import 插件才触发，容易漏查；node 脚本生成/复制 JSON 后要验证无 BOM。
 - 胶水层 4 平台文件（web/app-js/mp-weixin/mp-alipay）除 `readImageBytes` 外完全同构：web 用 fetch，其余三端用 downloadFile+getFileSystemManager().readFile（参考 tui-color-thief app-js 实现）；批量同步时只替换 `export async function getInfo` 之后的公共段，头部 readImageBytes 各自保留。
+- **胶水层 App/小程序端严禁直接用 fetch**（tui-pdf 实录）：iOS 的 vapor JS 运行在 JavaScriptCore，**没有 fetch 全局**，报 "Can't find variable: fetch"（Android 引擎有 polyfill 所以本机测试不易暴露）；http 走 uni.downloadFile、本地/临时路径走 readFile（参照 tui-ffmpeg app-js 的 readBytes）。
 - nanosvg 的 `nsvgParse` **会原地修改输入字符串**（必须传可写、以 \0 结尾的副本，parse 完才能 free）；且对垃圾输入**不返回 null 而是空 image**——必须检查 `image->shapes == nullptr` 判定解析失败（svg_core.cc 的 ParseSvgCopy）。
 - nanosvgrast.h 的光栅化头文件名容易猜错：是 `nanosvgrast.h`（不是 nanosvg.raster.h），与 nanosvg.h 同在仓库 src/ 目录。
 - `nsvgRasterize` 只支持**单一等比 scale**（无 x/y 独立缩放）：renderSize 非等比时取 min(tx, ty)，内容贴左上、另一方向留透明。
@@ -204,6 +209,13 @@ WASM（需 emsdk，默认 `E:/emsdk`，可用环境变量 `EMSDK` 覆盖）：- 
 - 多图传递约定（napi/embind 同构）：胶水层把所有图拼成一个大 Uint8Array + 平铺 offsets `[start0,len0,start1,len1,...]`，绑定层再拆分——避免 napi 遍历对象数组与 embind 嵌套 vector 的跨端差异。
 - uni-gyp 的 `libraries` 条目会被加 `-l` 前缀——链接预编译静态库（.a）一律走 `ldflags` 原样传绝对路径（CMake 把 ldflags 输出在 objects 之后，顺序满足单遍解析）；gyp `sources` 里的 .a 会被 CMake 忽略（.so 只有几 KB 且符号全 U，被 `--unresolved-symbols=ignore-all` 掩盖，务必 nm 验证）。
 - ffmpeg 7.1 公共头**没有 extern "C" 保护**，且 `libavutil/time.h` 是真实公共头——头文件必须保持官方 `include/{libavformat,libavcodec,libswscale,libavutil}/` 子目录布局（平铺会让 `#include <time.h>` 命中 ffmpeg 的 time.h，tm/nanosleep 未声明 → libc++ locale/pthread 头全面报错），且使用方必须整体包 extern "C"。
+- ffmpeg configure 的 `--sysroot` 路径**带空格会被 configure 内部重分词拆掉**（即使 bash 引号正确）——DevEco NDK 在 `C:\Program Files\...`，用 junction `C:\ohos-ndk`（已建）绕过；ohos 交叉编要点：`--target-os=linux`（ohos 是 linux 内核）+ `--cc=clang --extra-cflags="--target=aarch64-linux-ohos -D__MUSL__" --sysroot=C:/ohos-ndk/sysroot` + llvm-ar/nm/ranlib/strip。
+- **内存 AVIO 写 muxer 三坑**（tui-ffmpeg 转码调试实录）：① avio_alloc_context **必须传 seek 回调**，否则 `pb->seekable=0`，mov/adts muxer write_header 直接报 "muxer does not support non seekable output"（EINVAL 且难猜）；② 回调必须实现"**逻辑位置写**"语义——seek 回调只更新 write 位置、write 回调按该位置 memcpy 覆盖（纯 append 的 insert 会让 mov trailer 回填 mdat size 的 4 字节 append 到文件尾，产物 mdat sz=0 → demux INVALIDDATA）；③ 收尾**不要用 avio_closep**（CUSTOM_IO 模式下其内部间接调用在 wasm 上 call_indirect 越界，报 "table index is out of bounds"）——正确姿势 `avio_flush + av_freep(&pb->buffer) + avio_context_free`。
+- wasm 崩溃 "table index is out of bounds"/"null function or function signature mismatch" = call_indirect 空槽，**不一定是堆损坏**（SAFE_HEAP 干净）——用 emcc `-g2` 产出 name section，Node 异常栈带 `wasm-function[N]:0xoffset` 直接定位到 C++ 函数（本次即定位到 avio_closep）。
+- emscripten glue 的 `ENVIRONMENT=web` 在 Node 里**直接 throw "not compiled for this environment"**；Node 测试要么构建时加 `web,node`，要么用 http server 提供 wasm（fetch 拉取，locateFile 不能给本地路径）。
+- ffmpeg 转码多流文件**必须用统一 demux 分发循环**（单循环 av_read_frame 按 stream_index 分发给各 StreamPlan）——按流逐个 `while(av_read_frame)` 处理会共享读指针，后处理的流只能拿到前流停止位置之后的包（症状：durationClip 输出时长错、音轨内容错）。
+- duration 裁剪到点后要 `avcodec_flush_buffers(dec)` 丢掉解码器缓冲的残留帧，否则输出比 durationMs 多出 1~3s（编码器/滤镜缓冲各存一段）。
+- 改 `scripts/*.js` 用 PowerShell `Set-Content -Encoding UTF8` 会**写 BOM**（binding.gyp 带 BOM 让 uni-gyp 报 `SyntaxError: invalid non-printable character U+FEFF`；UTF8 在 PS5.1 默认带 BOM）——写完脚本必须验证无 BOM；node 内联 `node -e "..."` 的引号在 PowerShell 会被反复吞（复现 5+ 次），一律写临时 .js 文件执行。
 - ffmpeg configure 的 `--sysroot` 路径**带空格会被 configure 内部重分词拆掉**（即使 bash 引号正确）——DevEco NDK 在 `C:\Program Files\...`，用 junction `C:\ohos-ndk`（已建）绕过；ohos 交叉编要点：`--target-os=linux`（ohos 是 linux 内核）+ `--cc=clang --extra-cflags="--target=aarch64-linux-ohos -D__MUSL__" --sysroot=C:/ohos-ndk/sysroot` + llvm-ar/nm/ranlib/strip。
 
 ### C++（src/）

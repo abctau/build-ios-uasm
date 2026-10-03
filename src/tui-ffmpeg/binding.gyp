@@ -6,6 +6,7 @@
       'sources': [
         'binding.cc',
         'ffmpeg_core.cc',
+        'transcode_core.cc',
       ],
       'include_dirs': [
         '.',
@@ -18,6 +19,8 @@
       'conditions': [
         ['OS == "android" and target_arch=="arm64"', {
           'ldflags': [
+            'E:/uvue/uasm-test/src/tui-ffmpeg/vendor/ffmpeg/lib/arm64-v8a/libavfilter.a',
+            'E:/uvue/uasm-test/src/tui-ffmpeg/vendor/ffmpeg/lib/arm64-v8a/libswresample.a',
             'E:/uvue/uasm-test/src/tui-ffmpeg/vendor/ffmpeg/lib/arm64-v8a/libavformat.a',
             'E:/uvue/uasm-test/src/tui-ffmpeg/vendor/ffmpeg/lib/arm64-v8a/libavcodec.a',
             'E:/uvue/uasm-test/src/tui-ffmpeg/vendor/ffmpeg/lib/arm64-v8a/libswscale.a',
@@ -26,6 +29,8 @@
         }],
         ['OS == "android" and (target_arch=="x64" or target_arch=="x86_64")', {
           'ldflags': [
+            'E:/uvue/uasm-test/src/tui-ffmpeg/vendor/ffmpeg/lib/x86_64/libavfilter.a',
+            'E:/uvue/uasm-test/src/tui-ffmpeg/vendor/ffmpeg/lib/x86_64/libswresample.a',
             'E:/uvue/uasm-test/src/tui-ffmpeg/vendor/ffmpeg/lib/x86_64/libavformat.a',
             'E:/uvue/uasm-test/src/tui-ffmpeg/vendor/ffmpeg/lib/x86_64/libavcodec.a',
             'E:/uvue/uasm-test/src/tui-ffmpeg/vendor/ffmpeg/lib/x86_64/libswscale.a',
@@ -34,6 +39,8 @@
         }],
         ['OS == "harmony" and target_arch=="arm64"', {
           'ldflags': [
+            'E:/uvue/uasm-test/src/tui-ffmpeg/vendor/ffmpeg/lib/ohos-arm64/libavfilter.a',
+            'E:/uvue/uasm-test/src/tui-ffmpeg/vendor/ffmpeg/lib/ohos-arm64/libswresample.a',
             'E:/uvue/uasm-test/src/tui-ffmpeg/vendor/ffmpeg/lib/ohos-arm64/libavformat.a',
             'E:/uvue/uasm-test/src/tui-ffmpeg/vendor/ffmpeg/lib/ohos-arm64/libavcodec.a',
             'E:/uvue/uasm-test/src/tui-ffmpeg/vendor/ffmpeg/lib/ohos-arm64/libswscale.a',
@@ -42,6 +49,8 @@
         }],
         ['OS == "harmony" and (target_arch=="x64" or target_arch=="x86_64")', {
           'ldflags': [
+            'E:/uvue/uasm-test/src/tui-ffmpeg/vendor/ffmpeg/lib/ohos-x86_64/libavfilter.a',
+            'E:/uvue/uasm-test/src/tui-ffmpeg/vendor/ffmpeg/lib/ohos-x86_64/libswresample.a',
             'E:/uvue/uasm-test/src/tui-ffmpeg/vendor/ffmpeg/lib/ohos-x86_64/libavformat.a',
             'E:/uvue/uasm-test/src/tui-ffmpeg/vendor/ffmpeg/lib/ohos-x86_64/libavcodec.a',
             'E:/uvue/uasm-test/src/tui-ffmpeg/vendor/ffmpeg/lib/ohos-x86_64/libswscale.a',
