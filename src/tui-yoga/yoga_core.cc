@@ -417,12 +417,21 @@ static YGSize MeasureCallback(YGNodeConstRef node, float width, YGMeasureMode wi
 }
 
 static void DestroyNodeRec(uint32_t id, YGNodeRef node) {
-	const size_t count = YGNodeGetChildCount(node);
-	for (size_t i = 0; i < count; ++i) {
-		YGNodeRef child = YGNodeGetChild(node, i);
+	/* YGNodeFree 内部会 owner->removeChild(node)，使父节点 children 向量左移；
+	   递增索引遍历会跳项并越界读到野指针（真机 SIGSEGV）。
+	   参照 yoga 自家 YGNodeFreeRecursive：始终取最后一个 child，先显式摘除再销毁。 */
+	while (YGNodeGetChildCount(node) > 0) {
+		const size_t last = YGNodeGetChildCount(node) - 1;
+		YGNodeRef child = YGNodeGetChild(node, last);
 		const NodeCtx* ctx = static_cast<const NodeCtx*>(YGNodeGetContext(child));
-		if (ctx != nullptr) DestroyNodeRec(ctx->id, child);
+		YGNodeRemoveChild(node, child);
+		if (ctx != nullptr) {
+			DestroyNodeRec(ctx->id, child);
+		} else {
+			YGNodeFree(child);
+		}
 	}
+	g_nodes.erase(id);
 	auto it = g_measured.find(id);
 	if (it != g_measured.end()) g_measured.erase(it);
 	YGNodeFree(node);
@@ -474,7 +483,6 @@ void FreeTree(uint32_t id) {
 	YGNodeRef node = GetNode(id);
 	if (node == nullptr) return;
 	DestroyNodeRec(id, node);
-	g_nodes.erase(id);
 }
 
 bool InsertChild(uint32_t parentId, uint32_t childId, int32_t index) {
