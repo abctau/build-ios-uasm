@@ -168,7 +168,7 @@ let inputTmpSeq = 0
 function writeTmpFile(bytes : Uint8Array, ext : string) : string {
 	inputTmpSeq++
 	const tmp = uni.env.USER_DATA_PATH + '/ff-in-' + Date.now().toString() + '-' + inputTmpSeq.toString() + ext
-	uni.getFileSystemManager().writeFile(tmp, bytes as any, 'binary')
+	uni.getFileSystemManager().writeFileSync(tmp, bytes as any, 'binary')
 	return tmp
 }
 

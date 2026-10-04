@@ -51,6 +51,9 @@
           ],
           'libraries': [
             '-lc++_shared',
+            # yoga debug/Log.cpp 的默认 logger 输出到 logcat，缺 -llog 会 dlopen 失败：
+            # cannot locate symbol "__android_log_vprint"
+            '-llog',
           ],
         }],
         ['OS == "ios"', {

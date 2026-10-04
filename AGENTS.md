@@ -210,6 +210,8 @@ WASM（需 emsdk，默认 `E:/emsdk`，可用环境变量 `EMSDK` 覆盖）：- 
 - 混编 C 静态库源码（如 vendor/zip.c）进 uni-gyp：configure 类宏必须显式定义（zip.c 依赖 `-DZIP_HAVE_SYMLINK=1` 才会 include `<unistd.h>`，否则 ftruncate/symlink/unlink 编译失败）；binding.gyp 的 `defines` 或 wasm 脚本参数里补齐。
 - em++ 会把 `.c` 当 C++ 编译（`-x c` 不可与 `-std=c++20` 全局混用）；分步编译（.cc 一次、.c 一次）再链接最稳，见 scripts/build-wasm-tui-zip.js。
 - 单头 amalgamation 库（miniz.h 声明+实现一体、符号非 static）只能在一个编译单元 include；其他 TU 需要 API 时用 extern "C" 重新声明（照抄结构体布局，见 src/tui-zip/zip_core.cc）。
+- **Android 链接 `-Wl,--unresolved-symbols=ignore-all` 会静默放过未解析符号**：tui-yoga 首次 Android 真机 dlopen 报 `cannot locate symbol "__android_log_vprint"`（yoga vendor 的 debug/Log.cpp 在 `#ifdef ANDROID` 下输出 logcat，需要 `-llog`）——链接期被 ignore-all 掩盖，产物却装不进基座；所有新插件 Android 构建后必须 `llvm-nm -u xxx.so` 确认无预期外未解析符号，并真机 dlopen 验证。
+- **`FileSystemManager.writeFile` 只接受 options 对象**（三参位置调用报 "parameters length error, got 3 parameters"）；三参位置写文件用 **`writeFileSync(filePath, data, encoding?)`**（同步且支持缺省 encoding）——见 tui-ffmpeg 胶水 writeTmpFile。
 - stb 系列单头库的 `STB_IMAGE_IMPLEMENTATION` / `STB_IMAGE_RESIZE_IMPLEMENTATION` / `STB_IMAGE_WRITE_IMPLEMENTATION` 必须全部定义在同一个编译单元（src/tui-image/image_core.cc），binding 层只 include image_core.h，避免实现重复。
 - `stbi_write_jpg` 无 alpha 通道：输出 JPEG 前需把半透明像素铺白底合成（image_core.cc 的 FlattenAlphaToWhite），否则 alpha 被当颜色通道写坏。
 - resize2 的 sRGB 接口：`stbir_resize_uint8_srgb(in, w, h, stride, out, tw, th, stride, STBIR_RGBA)`，out 传 nullptr 自动分配；测试静态图若是 Adam7 隔行 PNG，自写的参考解码器必须处理 interlace，否则像素级比对会误报（stb 自动处理，以 stb 为准）。
